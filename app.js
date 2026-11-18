@@ -1,7 +1,7 @@
 import * as C from './config.js';
 import { initStore, isDemo } from './store.js';
 import { payments, validTrxId } from './payments.js';
-import { T, CATS, PRESETS, THEMES, MONTHS, MONTHS_S, WDAYS, WDAYS_S, CHEERS, CAT_COLORS, EMOJI_GROUPS, FONTS_BN, FONTS_EN } from './i18n.js';
+import { T, CATS, PRESETS, THEMES, MONTHS, MONTHS_S, WDAYS, WDAYS_S, CHEERS, CAT_COLORS, EMOJI_GROUPS, FONTS_BN, FONTS_EN, DEVELOPER } from './i18n.js';
 import { barChart, donut, ring } from './charts.js';
 import { I } from './icons.js';
 
@@ -499,9 +499,13 @@ function vMe() {
     <div class="lrow">${I.hash}<span class="grow">${t('digits')}</span><div class="seg mini"><button class="${bnDigits() ? 'on' : ''}" data-a="digits" data-v="bn">১২৩</button><button class="${!bnDigits() ? 'on' : ''}" data-a="digits" data-v="en">123</button></div></div>
   </div>
   <div class="sec-h"><h3>${t('badges')}</h3></div><div class="badges">${bd.map(b => `<div class="badge ${b.n ? '' : 'locked'}"><span>${b.ic}</span><b>${b.name}</b><small>${b.n ? (b.count ? '×' + dg(b.n) : '✓') : b.hint}</small></div>`).join('')}</div>
+  <div class="sec-h"><h3>${t('aboutApp')}</h3></div><div class="card list">
+    ${meRow(I.shield, t('privacy'), '', 'privacy')}
+    ${meRow(I.user, t('aboutDev'), esc(DEVELOPER.name), 'aboutDev')}
+  </div>
   ${S.user && store.isAdmin() ? `<a class="btn soft wide" href="admin.html">${t('adminPage')}</a>` : ''}
   ${S.user ? `<button class="btn soft wide danger-t" data-a="logout">${I.logout} ${t('logout')}</button>` : ''}
-  <p class="hint">${t('appName')} · v${C.APP_VERSION}${isDemo ? ' · demo' : ''}</p></div>`;
+  <p class="hint">${t('appName')} · v${C.APP_VERSION}${isDemo ? ' · demo' : ''} · ${t('madeBy')} ${esc(DEVELOPER.name)}</p></div>`;
   return h;
 }
 const meRow = (ic, l, v, a) => `<button class="lrow" data-a="${a}">${ic}<span class="grow">${l}</span><small class="muted">${v}</small><span class="chev">${I.chev}</span></button>`;
@@ -876,6 +880,19 @@ const authErr = e => {
   return t(map[e?.code] || 'errGeneric');
 };
 
+/* ───────── privacy note & about the developer ───────── */
+function openPrivacy() {
+  openSheet(`<h3>${t('privacy')}</h3><div class="prose">${t('privacyBody')}</div>
+    <button class="btn primary wide" data-a="closeSheet">${t('done')}</button>`, 'privacy', 'tall');
+}
+function openAboutDev() {
+  openSheet(`<div class="about"><div class="dev-av">${esc(DEVELOPER.name.split(' ').map(w => w[0]).slice(0, 2).join(''))}</div>
+    <h3 class="center">${esc(DEVELOPER.name)}</h3><p class="muted small center">${t('devRole')}</p>
+    <div class="card list"><a class="lrow" href="mailto:${DEVELOPER.email}">${I.mail}<span class="grow">${esc(DEVELOPER.email)}</span><span class="chev">${I.chev}</span></a></div>
+    <button class="btn soft wide" data-a="copyText" data-v="${esc(DEVELOPER.email)}">${t('copyEmail')}</button>
+    <p class="hint">${t('devNote')}</p><p class="hint">${t('appName')} · v${C.APP_VERSION}</p></div>`, 'about');
+}
+
 /* ───────── Pro ───────── */
 function openPaywall(reason = '') {
   const ps = proState(), feats = ['pf_targets', 'pf_themes', 'pf_export', 'pf_recurring', 'pf_fx'];
@@ -1051,6 +1068,8 @@ const ACT = {
     applyPrefs(); render(); toast(t('loggedOut'));
   },
   pay: () => openPaywall(),
+  privacy: () => openPrivacy(),
+  aboutDev: () => openAboutDev(),
   payNow: () => openPay(),
 };
 

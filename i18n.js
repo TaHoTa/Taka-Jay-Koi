@@ -4,7 +4,14 @@ export const T = {
   bn: {
     appName: 'টাকা যায় কই?',
     navHome: 'হোম', navCharts: 'চার্ট', navCal: 'ক্যালেন্ডার', navMe: 'সেটিংস', add: 'যোগ করো',
-    search: 'খুঁজুন', spentThisPeriod: 'এই মাসে খরচ', taka: 'টাকা', totalTaka: 'মোট টাকা', bigRule: 'মোটের ৪০%-এর বেশি', bigOff: 'বাদ', fontBn: 'বাংলা ফন্ট', fontEn: 'English ফন্ট', today: 'আজ', yesterday: 'গতকাল', avgDay: 'দৈনিক গড়', streak: 'টানা দিন',
+    search: 'খুঁজুন', spentThisPeriod: 'এই মাসে খরচ', aboutApp: 'অ্যাপ সম্পর্কে', privacy: 'প্রাইভেসি নোট', aboutDev: 'ডেভেলপার', devRole: 'ডেভেলপার · টাকা যায় কই?', copyEmail: 'ইমেইল কপি করো', devNote: 'মতামত, সমস্যা বা ডেটা মোছার অনুরোধ, এই ইমেইলে জানাও।', madeBy: 'তৈরি করেছেন', privacyBody: `<p><b>সংক্ষেপে:</b> তোমার খরচের হিসাব তোমারই। আমরা কখনো বিক্রি করি না, কারো সাথে শেয়ার করি না, বিজ্ঞাপনেও ব্যবহার করি না।</p>
+<h4>কী রাখা হয়</h4><ul><li><b>ফোনে:</b> খরচ, খাত, টার্গেট আর সেটিংস। সাইন ইন না করলে সব শুধু তোমার ফোনেই থাকে।</li>
+<li><b>ব্যাকআপে (সাইন ইন করলে):</b> তোমার ইমেইল, খরচ, খাত, টার্গেট আর সেটিংস Supabase-এর সার্ভারে (সিঙ্গাপুর) রাখা হয়, যাতে নতুন ফোনে ফেরত পাও।</li>
+<li><b>Pro কিনলে:</b> bKash TrxID, ইমেইল আর পাঠানো নম্বরের শেষ ৪ সংখ্যা, শুধু পেমেন্ট যাচাইয়ের জন্য।</li></ul>
+<h4>কে দেখতে পারে</h4><ul><li>অন্য কোনো ইউজার তোমার হিসাব দেখতে পারে না।</li>
+<li>ব্যাকআপের ডেটা এনক্রিপ্টেড না। তাই ডেভেলপার সার্ভার চালানোর কাজে কারিগরিভাবে দেখতে পারে, তবে সমস্যা সমাধান ছাড়া দেখা হয় না।</li></ul>
+<h4>অন্যান্য</h4><ul><li>কোনো বিজ্ঞাপন বা ট্র্যাকিং নেই।</li><li>আলাদা ফন্ট বেছে নিলে সেটা Google Fonts থেকে নামে।</li></ul>
+<h4>ডেটা মুছতে চাইলে</h4><p>ফোন থেকে মুছতে সাইন আউট করো বা অ্যাপের ডেটা মুছে দাও। ব্যাকআপসহ পুরো অ্যাকাউন্ট মুছতে ডেভেলপারকে ইমেইল করলে মুছে দেওয়া হবে।</p>`, taka: 'টাকা', totalTaka: 'মোট টাকা', bigRule: 'মোটের ৪০%-এর বেশি', bigOff: 'বাদ', fontBn: 'বাংলা ফন্ট', fontEn: 'English ফন্ট', today: 'আজ', yesterday: 'গতকাল', avgDay: 'দৈনিক গড়', streak: 'টানা দিন',
     backToNow: 'এই মাসে ফেরো',
     howMuch: 'খরচ কত হল?', notePh: 'খরচের বিবরণ', pickDate: 'তারিখ', save: 'সেভ', more: 'আরও', newCat: 'নতুন খাত',
     enterAmount: 'টাকার পরিমাণ লেখো', pickCat: 'একটা খাত বেছে নাও', updated: 'আপডেট হয়েছে',
@@ -64,7 +71,14 @@ export const T = {
   en: {
     appName: 'Money Tracking',
     navHome: 'Home', navCharts: 'Charts', navCal: 'Calendar', navMe: 'Settings', add: 'Add',
-    search: 'Search', spentThisPeriod: 'Spent this month', taka: 'Taka', totalTaka: 'Total taka', bigRule: 'Over 40% of the total', bigOff: 'Hidden', fontBn: 'Bangla font', fontEn: 'English font', today: 'Today', yesterday: 'Yesterday', avgDay: 'Daily avg', streak: 'Streak',
+    search: 'Search', spentThisPeriod: 'Spent this month', aboutApp: 'About', privacy: 'Privacy note', aboutDev: 'Developer', devRole: 'Developer · Money Tracking', copyEmail: 'Copy email', devNote: 'Feedback, problems or a data-deletion request: write to this email.', madeBy: 'Made by', privacyBody: `<p><b>In short:</b> your expenses are yours. We never sell them, share them, or use them for ads.</p>
+<h4>What is stored</h4><ul><li><b>On your phone:</b> expenses, categories, targets and settings. Without signing in, everything stays only on your phone.</li>
+<li><b>In backup (if you sign in):</b> your email, expenses, categories, targets and settings are kept on Supabase servers (Singapore) so you can restore them on a new phone.</li>
+<li><b>If you buy Pro:</b> the bKash TrxID, your email and the last 4 digits of the sending number, only to verify the payment.</li></ul>
+<h4>Who can see it</h4><ul><li>Other users can't see your data.</li>
+<li>Backup data is not encrypted, so the developer can technically access it while running the server. It is only looked at to fix a problem.</li></ul>
+<h4>Other</h4><ul><li>No ads, no tracking.</li><li>If you pick an extra font, it downloads from Google Fonts.</li></ul>
+<h4>Deleting your data</h4><p>To remove data from your phone, sign out or clear the app's data. To delete your whole account including the backup, email the developer; it will be deleted.</p>`, taka: 'Taka', totalTaka: 'Total taka', bigRule: 'Over 40% of the total', bigOff: 'Hidden', fontBn: 'Bangla font', fontEn: 'English font', today: 'Today', yesterday: 'Yesterday', avgDay: 'Daily avg', streak: 'Streak',
     backToNow: 'Back to this month',
     howMuch: 'How much did you spend?', notePh: 'Expense details', pickDate: 'Date', save: 'Save', more: 'More', newCat: 'New category',
     enterAmount: 'Enter an amount', pickCat: 'Pick a category', updated: 'Updated',
@@ -216,3 +230,5 @@ export const FONTS_EN = [
   { id: 'nunito', name: 'Nunito', css: "'Nunito'", g: 'Nunito:wght@400;600;700' },
   { id: 'dmsans', name: 'DM Sans', css: "'DM Sans'", g: 'DM+Sans:wght@400;500;600;700' },
 ];
+
+export const DEVELOPER = { name: 'Tazammul Hossain Taz', email: 'tazammul.h.t@gmail.com' };
