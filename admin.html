@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="bn" data-mode="system">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>অ্যাডমিন · টাকা যায় কই?</title>
+<meta name="theme-color" content="#D7263D">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="fonts/fonts.css">
+<link rel="stylesheet" href="styles.css">
+<style>
+  
+  .pay { display: grid; gap: 6px; }
+  .pay .ptop { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .pay code { font-size: 1.1rem; font-weight: 700; letter-spacing: .5px; }
+  .st { font-size: .75rem; font-weight: 700; padding: 3px 9px; border-radius: 8px; }
+  .st.pending { background: #FFF1C9; color: #7A5600; } .st.approved { background: #DDF7E8; color: #156B40; } .st.rejected { background: #FFE2E6; color: #8A1020; }
+  .filters { display: flex; gap: 8px; margin: 10px 0 14px; flex-wrap: wrap; }
+  .count { background: var(--accent); color: #fff; border-radius: 99px; padding: 0 8px; margin-left: 4px; font-size: .78rem; }
+</style>
+</head>
+<body>
+<div id="root"></div><div id="toast-layer"></div>
+<script type="module" src="admin.js"></script>
+</body>
+</html>

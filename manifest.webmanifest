@@ -1,0 +1,17 @@
+{
+  "name": "টাকা যায় কই?",
+  "short_name": "টাকা যায় কই?",
+  "description": "প্রতিটা টাকার হিসাব, এক ট্যাপে",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFF8F8",
+  "theme_color": "#E11D48",
+  "lang": "bn",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
