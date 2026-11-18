@@ -5,7 +5,7 @@
 // 1) Supabase (Project Settings → API Keys / Data API).
 //    Leave SUPABASE_URL empty ("") to run in DEMO mode: everything stays on this one phone.
 export const SUPABASE_URL = "https://bfgdcrmytaxnbfgntqgd.supabase.co";            // e.g. "https://abcdxyz.supabase.co"
-export const SUPABASE_ANON_KEY = "https://bfgdcrmytaxnbfgntqgd.supabase.co";       // the publishable / anon key (safe to put in the app)
+export const SUPABASE_ANON_KEY = "sb_publishable_ecJZqtUeG1PfAy7ISh8agg_epb-r95C";       // the publishable / anon key (safe to put in the app)
 
 // 2) Admins are set in the database, not here:
 //    insert into public.admins(email) values ('you@example.com');   (see supabase.sql)
