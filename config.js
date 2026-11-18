@@ -21,4 +21,4 @@ export const FREE_TARGETS = 3;
 // 5) Payment method. "manual-bkash" now; later swap to a gateway module (see payments.js).
 export const PAYMENT_METHOD = "manual-bkash";
 
-export const APP_VERSION = "2.0.0";
+export const APP_VERSION = "2.0.1";
