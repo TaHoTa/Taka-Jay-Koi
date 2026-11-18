@@ -4,7 +4,7 @@ export const T = {
   bn: {
     appName: 'টাকা যায় কই?',
     navHome: 'হোম', navCharts: 'চার্ট', navCal: 'ক্যালেন্ডার', navMe: 'সেটিংস', add: 'যোগ করো',
-    search: 'খুঁজুন', spentThisPeriod: 'এই মাসে খরচ', aboutApp: 'অ্যাপ সম্পর্কে', privacy: 'প্রাইভেসি নোট', aboutDev: 'ডেভেলপার', devRole: 'ডেভেলপার · টাকা যায় কই?', copyEmail: 'ইমেইল কপি করো', devNote: 'মতামত, সমস্যা বা ডেটা মোছার অনুরোধ, এই ইমেইলে জানাও।', madeBy: 'তৈরি করেছেন', privacyBody: `<p><b>সংক্ষেপে:</b> তোমার খরচের হিসাব তোমারই। আমরা কখনো বিক্রি করি না, কারো সাথে শেয়ার করি না, বিজ্ঞাপনেও ব্যবহার করি না।</p>
+    search: 'খুঁজুন', spentThisPeriod: 'এই মাসে খরচ', aboutApp: 'অ্যাপ সম্পর্কে', privacy: 'প্রাইভেসি নোট', aboutDev: 'ডেভেলপার', devRole: 'ডেভেলপার · টাকা যায় কই?', copyEmail: 'ইমেইল কপি করো', devNote: 'মতামত বা সমস্যা এই ইমেইলে জানাও।', madeBy: 'তৈরি করেছেন', privacyBody: `<p><b>সংক্ষেপে:</b> তোমার খরচের হিসাব তোমারই। আমরা কখনো বিক্রি করি না, কারো সাথে শেয়ার করি না, বিজ্ঞাপনেও ব্যবহার করি না।</p>
 <h4>কী রাখা হয়</h4><ul><li><b>ফোনে:</b> খরচ, খাত, টার্গেট আর সেটিংস। সাইন ইন না করলে সব শুধু তোমার ফোনেই থাকে।</li>
 <li><b>ব্যাকআপে (সাইন ইন করলে):</b> তোমার ইমেইল, খরচ, খাত, টার্গেট আর সেটিংস Supabase-এর সার্ভারে (সিঙ্গাপুর) রাখা হয়, যাতে নতুন ফোনে ফেরত পাও।</li>
 <li><b>Pro কিনলে:</b> bKash TrxID, ইমেইল আর পাঠানো নম্বরের শেষ ৪ সংখ্যা, শুধু পেমেন্ট যাচাইয়ের জন্য।</li></ul>
@@ -71,7 +71,7 @@ export const T = {
   en: {
     appName: 'Money Tracking',
     navHome: 'Home', navCharts: 'Charts', navCal: 'Calendar', navMe: 'Settings', add: 'Add',
-    search: 'Search', spentThisPeriod: 'Spent this month', aboutApp: 'About', privacy: 'Privacy note', aboutDev: 'Developer', devRole: 'Developer · Money Tracking', copyEmail: 'Copy email', devNote: 'Feedback, problems or a data-deletion request: write to this email.', madeBy: 'Made by', privacyBody: `<p><b>In short:</b> your expenses are yours. We never sell them, share them, or use them for ads.</p>
+    search: 'Search', spentThisPeriod: 'Spent this month', aboutApp: 'About', privacy: 'Privacy note', aboutDev: 'Developer', devRole: 'Developer · Money Tracking', copyEmail: 'Copy email', devNote: 'For feedback or problems, write to this email.', madeBy: 'Made by', privacyBody: `<p><b>In short:</b> your expenses are yours. We never sell them, share them, or use them for ads.</p>
 <h4>What is stored</h4><ul><li><b>On your phone:</b> expenses, categories, targets and settings. Without signing in, everything stays only on your phone.</li>
 <li><b>In backup (if you sign in):</b> your email, expenses, categories, targets and settings are kept on Supabase servers (Singapore) so you can restore them on a new phone.</li>
 <li><b>If you buy Pro:</b> the bKash TrxID, your email and the last 4 digits of the sending number, only to verify the payment.</li></ul>
