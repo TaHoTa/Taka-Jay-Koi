@@ -1,6 +1,8 @@
 -- ═══════════════════════════════════════════════════════════════════
 --  টাকা যায় কই? (Money Tracking) — Supabase setup
---  Run ONCE: Supabase → SQL Editor → New query → paste everything → Run.
+--  Supabase → SQL Editor → New query → paste everything → Run.
+--  Safe to run again: it only adds what is missing and never deletes your data.
+--  (Already ran an older version? Just run this whole file once more.)
 --  ⚠️ Change the admin email on the last lines (marked CHANGE ME).
 -- ═══════════════════════════════════════════════════════════════════
 
@@ -191,6 +193,112 @@ create policy "submit own payment" on public.payments for insert
 create policy "read payments" on public.payments for select using (uid = auth.uid() or public.is_admin());
 revoke update, delete on public.payments from anon, authenticated;
 
+-- ═══════════════════════════════════════════════════════════════════
+--  Shared family book (v2.1)
+--  • Only the creator needs Pro (or be inside the trial); joining is free.
+--  • One shared book per person. Personal books stay separate.
+-- ═══════════════════════════════════════════════════════════════════
+alter table public.books        add column if not exists name text check (length(name) <= 40);
+alter table public.books        add column if not exists code text;
+alter table public.books        add column if not exists meta jsonb;          -- shared categories & targets
+alter table public.book_members add column if not exists email text;
+alter table public.entries      add column if not exists who uuid;           -- who wrote this expense
+create unique index if not exists books_code_idx on public.books (code) where code is not null;
+
+-- Trial days on the server. Keep the same as TRIAL_DAYS in config.js.
+create or replace function public.trial_days() returns int language sql immutable as $$ select 15 $$;
+
+-- every shared book I'm in, with its members (the code is only shown to the owner)
+create or replace function public.my_books() returns jsonb
+language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id', b.id, 'name', b.name, 'owner', b.owner,
+    'code', case when b.owner = auth.uid() then b.code end,
+    'meta', b.meta,
+    'members', (select coalesce(jsonb_agg(jsonb_build_object('uid', m.user_id, 'email', coalesce(m.email, '')) order by m.added_at), '[]'::jsonb)
+                from public.book_members m where m.book_id = b.id)
+  ) order by b.created_at), '[]'::jsonb)
+  from public.books b
+  where b.kind = 'shared' and public.is_member(b.id);
+$$;
+
+create or replace function public.create_shared_book(p_name text, p_meta jsonb) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_id uuid; v_code text; v_ok boolean;
+  A constant text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+begin
+  if auth.uid() is null then raise exception 'not signed in'; end if;
+  select (pro or created_at > now() - make_interval(days => public.trial_days())) into v_ok from public.profiles where id = auth.uid();
+  if not coalesce(v_ok, false) then raise exception 'book/need-pro'; end if;
+  if exists (select 1 from public.book_members m join public.books b on b.id = m.book_id
+             where m.user_id = auth.uid() and b.kind = 'shared') then raise exception 'book/one-only'; end if;
+  loop
+    v_code := (select string_agg(substr(A, 1 + floor(random() * 32)::int, 1), '') from generate_series(1, 6));
+    exit when not exists (select 1 from public.books where code = v_code);
+  end loop;
+  insert into public.books (owner, kind, name, code, meta)
+    values (auth.uid(), 'shared', left(coalesce(nullif(trim(p_name), ''), 'Family'), 40), v_code, p_meta)
+    returning id into v_id;
+  insert into public.book_members (book_id, user_id, role, email)
+    values (v_id, auth.uid(), 'owner', (select email from auth.users where id = auth.uid()));
+  return jsonb_build_object('id', v_id, 'code', v_code);
+end $$;
+
+create or replace function public.join_book(p_code text) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare v_id uuid;
+begin
+  if auth.uid() is null then raise exception 'not signed in'; end if;
+  select id into v_id from public.books where kind = 'shared' and code = upper(trim(p_code));
+  if v_id is null then raise exception 'book/not-found'; end if;
+  if public.is_member(v_id) then return v_id; end if;
+  if exists (select 1 from public.book_members m join public.books b on b.id = m.book_id
+             where m.user_id = auth.uid() and b.kind = 'shared') then raise exception 'book/one-only'; end if;
+  insert into public.book_members (book_id, user_id, role, email)
+    values (v_id, auth.uid(), 'member', (select email from auth.users where id = auth.uid()));
+  return v_id;
+end $$;
+
+-- shared categories & targets: newest version wins
+create or replace function public.put_book_meta(p_book uuid, p_meta jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_member(p_book) then raise exception 'not a member'; end if;
+  update public.books set meta = p_meta
+   where id = p_book and kind = 'shared'
+     and coalesce((meta->>'updatedAt')::bigint, 0) <= coalesce((p_meta->>'updatedAt')::bigint, 0);
+end $$;
+
+create or replace function public.remove_member(p_book uuid, p_user uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not exists (select 1 from public.books where id = p_book and owner = auth.uid() and kind = 'shared') then raise exception 'book/not-owner'; end if;
+  if p_user = auth.uid() then raise exception 'owner cannot be removed'; end if;
+  delete from public.book_members where book_id = p_book and user_id = p_user;
+end $$;
+
+create or replace function public.leave_book(p_book uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if exists (select 1 from public.books where id = p_book and owner = auth.uid()) then raise exception 'book/owner-cannot-leave'; end if;
+  delete from public.book_members b using public.books k
+   where b.book_id = p_book and b.user_id = auth.uid() and k.id = b.book_id and k.kind = 'shared';
+end $$;
+
+-- owner closes the book: removes it (and its expenses) for everyone
+create or replace function public.delete_book(p_book uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not exists (select 1 from public.books where id = p_book and owner = auth.uid() and kind = 'shared') then raise exception 'book/not-owner'; end if;
+  delete from public.books where id = p_book;
+end $$;
+
+revoke execute on function public.my_books(), public.create_shared_book(text, jsonb), public.join_book(text),
+  public.put_book_meta(uuid, jsonb), public.remove_member(uuid, uuid), public.leave_book(uuid), public.delete_book(uuid) from public, anon;
+grant execute on function public.my_books(), public.create_shared_book(text, jsonb), public.join_book(text),
+  public.put_book_meta(uuid, jsonb), public.remove_member(uuid, uuid), public.leave_book(uuid), public.delete_book(uuid),
+  public.trial_days() to authenticated;
+
 -- ── Your admin email ────────────────────────────────────────────────
-insert into public.admins (email) values ('your-email@example.com')   -- ⚠️ CHANGE ME
+insert into public.admins (email) values ('tazammul.h.t@gmail.com')   -- ⚠️ CHANGE ME
 on conflict do nothing;

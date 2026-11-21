@@ -2,16 +2,41 @@
 
 export const T = {
   bn: {
-    appName: 'টাকা যায় কই?',
+    appName: 'টাকা যায় কই?', tagline: 'প্রতিটা টাকার হিসাব, এক ট্যাপে',
     navHome: 'হোম', navCharts: 'চার্ট', navCal: 'ক্যালেন্ডার', navMe: 'সেটিংস', add: 'যোগ করো',
-    search: 'খুঁজুন', spentThisPeriod: 'এই মাসে খরচ', aboutApp: 'অ্যাপ সম্পর্কে', privacy: 'প্রাইভেসি নোট', aboutDev: 'ডেভেলপার', devRole: 'ডেভেলপার · টাকা যায় কই?', copyEmail: 'ইমেইল কপি করো', devNote: 'মতামত বা সমস্যা এই ইমেইলে জানাও।', madeBy: 'তৈরি করেছেন', privacyBody: `<p><b>সংক্ষেপে:</b> তোমার খরচের হিসাব তোমারই। আমরা কখনো বিক্রি করি না, কারো সাথে শেয়ার করি না, বিজ্ঞাপনেও ব্যবহার করি না।</p>
+    search: 'খুঁজুন', spentThisPeriod: 'এই মাসে খরচ', me: 'আমি', swapBook: 'খাতা বদলাও', oneBookOnly: 'একটাই শেয়ার্ড খাতা রাখা যায়। নতুনটায় যেতে আগে এখনকার খাতা ছেড়ে দাও।', sharedBook: 'শেয়ার্ড খাতা', myBook: 'আমার খাতা', myBookSub: 'শুধু তুমি দেখবে', removedFromBook: 'তোমাকে খাতা থেকে বাদ দেওয়া হয়েছে', pickBook: 'কোন খাতা দেখবে?', nMembers: '{n} জন সদস্য', manageBooks: 'শেয়ার্ড খাতা ম্যানেজ করো',
+    sharedIntro: 'পরিবারের সবাই একই খাতায় খরচ লিখবে, আর দেখা যাবে কে কত খরচ করল। তোমার নিজের খাতা আলাদা আর গোপন থাকবে। একজন একটাই শেয়ার্ড খাতা রাখতে পারে।', owner: 'মালিক', member: 'সদস্য',
+    createBook: 'নতুন শেয়ার্ড খাতা', createBookSub: 'খাতা খুললে একটা কোড পাবে, সেটা পরিবারকে দাও।', createBookPro: 'খাতা খুলতে Pro লাগবে। যোগ দিতে লাগবে না।', bookNamePh: 'খাতার নাম', familyBook: 'পরিবারের খাতা', createBtn: 'খাতা খোলো',
+    joinBook: 'কোড দিয়ে যোগ দাও', joinBookSub: 'কেউ তোমাকে কোড দিলে এখানে বসাও। যোগ দেওয়া ফ্রি।', joinBtn: 'যোগ দাও', joined: 'খাতায় যোগ দিয়েছ 🎉', codeWrong: 'এই কোডের কোনো খাতা পাওয়া যায়নি',
+    inviteCode: 'আমন্ত্রণ কোড', members: 'সদস্য', openBook: 'এই খাতায় যাও', leaveBook: 'খাতা ছেড়ে দাও', leaveConfirm: 'এই খাতা ছেড়ে দেবে? তুমি আর এর খরচ দেখতে পাবে না।', kickConfirm: 'এই সদস্যকে বাদ দেবে?', remove: 'বাদ দাও',
+    inviteMsg: 'আমার "টাকা যায় কই?" খাতায় যোগ দাও। অ্যাপ খুলে সেটিংস → শেয়ার্ড খাতা → কোড দিন: {c}', whoSpent: 'কে কত খরচ করল',
+    demoPartner: 'ডেমো: পরিবারের একজন সদস্য যোগ করো', demoPartnerDone: 'ডেমো সদস্য যোগ হয়েছে, তার কয়েকটা খরচসহ',
+    ct_insights: 'ইনসাইট', in_sub: 'মাসের প্রথম {d} দিনের হিসাবে', in_proj: 'এই হারে চললে মাস শেষে মোট খরচ হবে প্রায় <b>{a}</b> টাকা',
+    in_up: '<b>{c}</b>-এ গত মাসের এই সময়ের চেয়ে <b>{p}%</b> বেশি গেছে ({a} টাকা বেশি)', in_down: '<b>{c}</b>-এ গত মাসের এই সময়ের চেয়ে <b>{p}%</b> কম গেছে, সাবাস! ({a} টাকা বাঁচল)',
+    in_wday: 'সবচেয়ে বেশি খরচ হয় <b>{d}</b> (মোট {a} টাকা)', in_zero: 'এই মাসে <b>{n} দিন</b> কোনো খরচ হয়নি 👏', in_nozero: 'এই মাসে প্রতিদিনই কিছু না কিছু খরচ হয়েছে',
+    in_note: 'সবচেয়ে বেশি টাকা গেছে <b>{n}</b>-এ ({a} টাকা)', in_big: 'সবচেয়ে বড় একক খরচ <b>{n}</b>: {a} টাকা ({d})', getPro: 'Pro নাও',
+    hideBtnSet: 'টাকা লুকানোর বাটন', hideBtnSub: 'চালু থাকলে অ্যাপ খুলবে মাসের মোট লুকানো অবস্থায়', security: 'নিরাপত্তা',
+    appLock: 'অ্যাপ লক', appLockSub: 'আঙুলের ছাপ, ফেস বা ফোনের PIN দিয়ে খুলবে', lockAfter: 'কখন লক হবে', la_0: 'সাথে সাথে', la_60: '১ মিনিট', la_300: '৫ মিনিট',
+    lockCancelled: 'লক চালু হয়নি', lockUnavailable: 'এই ফোনে আঙুলের ছাপ বা ফেস লক পাওয়া যায়নি', lockDemoAsk: 'এই ব্রাউজারে আঙুলের ছাপ চালানো যাচ্ছে না (ডেমো)। নকল লক দিয়ে দেখবে কেমন কাজ করে?',
+    lockOn: 'অ্যাপ লক চালু হয়েছে 🔒', lockOff: 'অ্যাপ লক বন্ধ হয়েছে', lockedMsg: 'অ্যাপ লক করা আছে', unlockBtn: 'আনলক করো', unlockFail: 'আনলক হয়নি, আবার চেষ্টা করো',
+    pf_insights: 'মাসের ইনসাইট', pd_insights: 'কোথায় খরচ বাড়ল-কমল, মাস শেষে কত হবে, নিজে থেকেই বলে দেয়', pf_shared: 'পরিবারের সাথে শেয়ার্ড খাতা', pd_shared: 'একই খাতায় সবাই লিখবে, কে কত খরচ করল দেখা যাবে',
+    pf_lock: 'অ্যাপ লক', pd_lock: 'আঙুলের ছাপ বা ফেস দিয়ে অ্যাপ খুলবে', pf_hide: 'টাকা লুকানো মোড', pd_hide: 'এক চাপে মাসের মোট টাকা লুকিয়ে রাখো', themesFree: 'ফ্রি', themesPro: 'Pro', themesNewSolid: 'নতুন · একরঙা', themesGrad: 'নতুন · গ্রেডিয়েন্ট',
+    seeBenefits: 'কী কী পাচ্ছ দেখো', comingSoon: 'শীঘ্রই আসছে', youGet: 'Pro-তে যা পাবে', youHave: 'তুমি যা পাচ্ছ',
+    trialUsing: 'এখন এগুলো ফ্রিতে চালাচ্ছ, আর {d} দিন বাকি', proSince: '{d} থেকে Pro',
+    pd_cats: 'ফ্রিতে ২০টি খাত, Pro-তে যত খুশি', pd_themes: '১৩টি বাড়তি রং, গ্রেডিয়েন্টসহ', pd_export: 'মাস বা বছরের হিসাব Excel আর PDF-এ', pd_recurring: 'ভাড়া, বিল প্রতি মাসে নিজে থেকেই যোগ হবে', pd_fx: 'টার্গেট রাখলে বা টানা লিখলে কনফেটি',
+    ps_insights: 'মাসের ইনসাইট', psd_insights: 'কোথায় খরচ বাড়ল-কমল, নিজে থেকেই বলে দেবে',
+    ps_shared: 'পরিবারের সাথে শেয়ার্ড খাতা', psd_shared: 'একই খাতায় সবাই লিখবে, কে কত খরচ করল দেখা যাবে',
+    ps_lock: 'অ্যাপ লক', psd_lock: 'আঙুলের ছাপ বা ফেস দিয়ে অ্যাপ খুলবে',
+    ps_hide: 'টাকা লুকানো মোড', psd_hide: 'এক চাপে মাসের মোট টাকা লুকিয়ে রাখো',
+    shareTitle: 'অ্যাপটা শেয়ার করো', shareSub: 'বন্ধু বা পরিবারকে পাঠাও, তারাও হিসাব রাখতে পারবে।', shareBtn: 'শেয়ার করো', copyLink: 'লিংক কপি',
+    shareMsg: 'মাসে টাকা কোথায় যায় দেখতে আমি এই অ্যাপটা ব্যবহার করি: টাকা যায় কই? 👉', demoPro: 'ডেমো: Pro সদস্য হিসেবে দেখো', demoTrialEnd: 'ডেমো: ট্রায়াল শেষ হয়ে গেছে', deleteBook: 'খাতাটা মুছে ফেলো', deleteBookConfirm: 'খাতাটা সবার জন্য মুছে যাবে, এর সব খরচসহ। আর ফেরত আনা যাবে না। মুছবে?', demoTrialEndSub: 'ফ্রি ইউজার কী দেখে, সেটা দেখো', aboutApp: 'অ্যাপ সম্পর্কে', privacy: 'প্রাইভেসি নোট', aboutDev: 'ডেভেলপার', devRole: 'ডেভেলপার · টাকা যায় কই?', copyEmail: 'ইমেইল কপি করো', devNote: 'মতামত, সমস্যা বা ডেটা মোছার অনুরোধ, এই ইমেইলে জানাও।', madeBy: 'তৈরি করেছেন', privacyBody: `<p><b>সংক্ষেপে:</b> তোমার খরচের হিসাব তোমারই। আমরা কখনো বিক্রি করি না, কারো সাথে শেয়ার করি না, বিজ্ঞাপনেও ব্যবহার করি না।</p>
 <h4>কী রাখা হয়</h4><ul><li><b>ফোনে:</b> খরচ, খাত, টার্গেট আর সেটিংস। সাইন ইন না করলে সব শুধু তোমার ফোনেই থাকে।</li>
 <li><b>ব্যাকআপে (সাইন ইন করলে):</b> তোমার ইমেইল, খরচ, খাত, টার্গেট আর সেটিংস Supabase-এর সার্ভারে (সিঙ্গাপুর) রাখা হয়, যাতে নতুন ফোনে ফেরত পাও।</li>
 <li><b>Pro কিনলে:</b> bKash TrxID, ইমেইল আর পাঠানো নম্বরের শেষ ৪ সংখ্যা, শুধু পেমেন্ট যাচাইয়ের জন্য।</li></ul>
 <h4>কে দেখতে পারে</h4><ul><li>অন্য কোনো ইউজার তোমার হিসাব দেখতে পারে না।</li>
 <li>ব্যাকআপের ডেটা এনক্রিপ্টেড না। তাই ডেভেলপার সার্ভার চালানোর কাজে কারিগরিভাবে দেখতে পারে, তবে সমস্যা সমাধান ছাড়া দেখা হয় না।</li></ul>
 <h4>অন্যান্য</h4><ul><li>কোনো বিজ্ঞাপন বা ট্র্যাকিং নেই।</li><li>আলাদা ফন্ট বেছে নিলে সেটা Google Fonts থেকে নামে।</li></ul>
-<h4>ডেটা মুছতে চাইলে</h4><p>ফোন থেকে মুছতে সাইন আউট করো বা অ্যাপের ডেটা মুছে দাও। ব্যাকআপসহ পুরো অ্যাকাউন্ট মুছতে ডেভেলপারকে ইমেইল করলে মুছে দেওয়া হবে।</p>`, taka: 'টাকা', totalTaka: 'মোট টাকা', bigRule: 'মোটের ৪০%-এর বেশি', bigOff: 'বাদ', fontBn: 'বাংলা ফন্ট', fontEn: 'English ফন্ট', today: 'আজ', yesterday: 'গতকাল', avgDay: 'দৈনিক গড়', streak: 'টানা দিন',
+<h4>ডেটা মুছতে চাইলে</h4><p>ফোন থেকে মুছতে সাইন আউট করো বা অ্যাপের ডেটা মুছে দাও। ব্যাকআপসহ পুরো অ্যাকাউন্ট মুছতে ডেভেলপারকে ইমেইল করো, ৭ দিনের মধ্যে মুছে দেওয়া হবে।</p>`, taka: 'টাকা', totalTaka: 'মোট টাকা', bigRule: 'মোটের ৪০%-এর বেশি', bigOff: 'বাদ', fontBn: 'বাংলা ফন্ট', fontEn: 'English ফন্ট', today: 'আজ', yesterday: 'গতকাল', avgDay: 'দৈনিক গড়', streak: 'টানা দিন',
     backToNow: 'এই মাসে ফেরো',
     howMuch: 'খরচ কত হল?', notePh: 'খরচের বিবরণ', pickDate: 'তারিখ', save: 'সেভ', more: 'আরও', newCat: 'নতুন খাত',
     enterAmount: 'টাকার পরিমাণ লেখো', pickCat: 'একটা খাত বেছে নাও', updated: 'আপডেট হয়েছে',
@@ -56,8 +81,8 @@ export const T = {
     targetsBody: 'যে খাতে নজর রাখতে চাও, শুধু সেখানে মাসের লিমিট দাও।', freeTargetsN: 'ফ্রিতে {n}টি টার্গেট', saved: 'সেভ হয়েছে',
     recBody: 'ভাড়া, বিলের মতো প্রতি মাসের খরচ নিজে থেকেই যোগ হবে।', recEvery: 'প্রতি মাসের {d} তারিখে', recNew: 'নতুন নিয়মিত খরচ', recNotePh: 'নাম (যেমন: বাসা ভাড়া)', recDay: 'তারিখ', amount: 'টাকা',
     recDelConfirm: 'এটা বন্ধ করে মুছে ফেলবে? আগের খরচগুলো থেকে যাবে।',
-    proName: 'Pro', why_targets: 'ফ্রিতে ৩টি টার্গেট দেওয়া যায়', why_themes: 'এই রংটা Pro-তে আছে', why_export: 'এক্সপোর্ট Pro-তে আছে', why_recurring: 'নিয়মিত খরচ Pro-তে আছে',
-    pf_targets: 'যত খুশি টার্গেট', pf_themes: 'আরও ৬টি রং', pf_export: 'Excel ও PDF রিপোর্ট', pf_recurring: 'নিয়মিত খরচ নিজে থেকে যোগ হবে', pf_fx: 'বাড়তি অ্যানিমেশন',
+    proName: 'Pro', why_cats: 'ফ্রিতে ২০টি খাত রাখা যায়', catCount: '{n}/{m}টি খাত', why_themes: 'এই রংটা Pro-তে আছে', why_export: 'এক্সপোর্ট Pro-তে আছে', why_recurring: 'নিয়মিত খরচ Pro-তে আছে',
+    pf_cats: '২০টির বেশি খাত', pf_themes: 'আরও ১৩টি রং', pf_export: 'Excel ও PDF রিপোর্ট', pf_recurring: 'নিয়মিত খরচ নিজে থেকে যোগ হবে', pf_fx: 'বাড়তি অ্যানিমেশন',
     oneTime: 'একবারই', payBkash: 'bKash দিয়ে নাও', freeForever: 'খরচ লেখা, চার্ট আর ব্যাকআপ সবসময় ফ্রি', youArePro: 'তুমি এখন Pro!', thanks: 'সাপোর্ট করার জন্য ধন্যবাদ', done: 'ঠিক আছে',
     proActivated: 'Pro চালু হয়েছে! 🎉',
     payPending: 'যাচাই হচ্ছে, সাধারণত কয়েক ঘণ্টা লাগে', payRejected: 'আগের TrxID মেলেনি। ঠিকটা দিয়ে আবার পাঠাও।',
@@ -69,16 +94,41 @@ export const T = {
     monthStartBody: 'বেতনের দিন থেকে মাস গুনতে চাইলে তারিখ বদলাও। যেমন ২৫ দিলে ২৫ তারিখ থেকে পরের মাসের ২৪ তারিখ পর্যন্ত।',
   },
   en: {
-    appName: 'Money Tracking',
+    appName: 'Money Tracking', tagline: 'Every taka, one tap away',
     navHome: 'Home', navCharts: 'Charts', navCal: 'Calendar', navMe: 'Settings', add: 'Add',
-    search: 'Search', spentThisPeriod: 'Spent this month', aboutApp: 'About', privacy: 'Privacy note', aboutDev: 'Developer', devRole: 'Developer · Money Tracking', copyEmail: 'Copy email', devNote: 'For feedback or problems, write to this email.', madeBy: 'Made by', privacyBody: `<p><b>In short:</b> your expenses are yours. We never sell them, share them, or use them for ads.</p>
+    search: 'Search', spentThisPeriod: 'Spent this month', me: 'Me', swapBook: 'Swap book', oneBookOnly: 'You can have one shared book. Leave your current one first to join another.', sharedBook: 'Shared book', myBook: 'My book', myBookSub: 'Only you see this', removedFromBook: 'You were removed from the book', pickBook: 'Which book?', nMembers: '{n} members', manageBooks: 'Manage shared books',
+    sharedIntro: 'Everyone in the family logs in one book and you see who spent what. Your own book stays separate and private. Each person can have one shared book.', owner: 'Owner', member: 'Member',
+    createBook: 'New shared book', createBookSub: "You'll get a code to give your family.", createBookPro: 'Creating a book needs Pro. Joining is free.', bookNamePh: 'Book name', familyBook: 'Family book', createBtn: 'Create book',
+    joinBook: 'Join with a code', joinBookSub: 'If someone gave you a code, enter it here. Joining is free.', joinBtn: 'Join', joined: 'You joined the book 🎉', codeWrong: 'No book found with this code',
+    inviteCode: 'Invite code', members: 'Members', openBook: 'Open this book', leaveBook: 'Leave book', leaveConfirm: "Leave this book? You won't see its expenses any more.", kickConfirm: 'Remove this member?', remove: 'Remove',
+    inviteMsg: 'Join my Money Tracking book. Open the app → Settings → Shared book → enter code: {c}', whoSpent: 'Who spent how much',
+    demoPartner: 'Demo: add a family member', demoPartnerDone: 'Demo member added with a few expenses',
+    ct_insights: 'Insights', in_sub: 'Based on the first {d} days of the month', in_proj: 'At this pace the month will end at about <b>{a}</b> taka',
+    in_up: '<b>{c}</b> is up <b>{p}%</b> on the same point last month ({a} more)', in_down: '<b>{c}</b> is down <b>{p}%</b> on the same point last month, nice! ({a} saved)',
+    in_wday: 'You spend the most on <b>{d}</b> ({a} in total)', in_zero: '<b>{n} days</b> with no spending this month 👏', in_nozero: 'You spent something every day this month',
+    in_note: 'The most money went on <b>{n}</b> ({a})', in_big: 'Biggest single expense <b>{n}</b>: {a} ({d})', getPro: 'Get Pro',
+    hideBtnSet: 'Hide money button', hideBtnSub: "When on, the app opens with the month's total hidden", security: 'Security',
+    appLock: 'App lock', appLockSub: "Open with fingerprint, face or the phone's PIN", lockAfter: 'Lock after', la_0: 'Instantly', la_60: '1 min', la_300: '5 min',
+    lockCancelled: 'App lock was not turned on', lockUnavailable: 'No fingerprint or face lock found on this phone', lockDemoAsk: "Fingerprint isn't available in this browser (demo). Try a pretend lock to see how it works?",
+    lockOn: 'App lock is on 🔒', lockOff: 'App lock is off', lockedMsg: 'The app is locked', unlockBtn: 'Unlock', unlockFail: "Couldn't unlock, try again",
+    pf_insights: 'Monthly insights', pd_insights: 'Shows where spending went up or down and where the month will end', pf_shared: 'Shared family book', pd_shared: 'Everyone logs in one book and sees who spent what',
+    pf_lock: 'App lock', pd_lock: 'Open the app with fingerprint or face', pf_hide: 'Hide money mode', pd_hide: "Hide the month's total with one tap", themesFree: 'Free', themesPro: 'Pro', themesNewSolid: 'New · solid', themesGrad: 'New · gradient',
+    seeBenefits: 'See what you get', comingSoon: 'Coming soon', youGet: 'What Pro gives you', youHave: 'What you have',
+    trialUsing: "You're using these free for {d} more day(s)", proSince: 'Pro since {d}',
+    pd_cats: '20 categories free, unlimited with Pro', pd_themes: '13 extra colours, including gradients', pd_export: 'Month or year reports in Excel and PDF', pd_recurring: 'Rent and bills added automatically every month', pd_fx: 'Confetti when you keep targets or streaks',
+    ps_insights: 'Monthly insights', psd_insights: 'Tells you where spending went up or down',
+    ps_shared: 'Shared family book', psd_shared: 'Everyone logs in one book and sees who spent what',
+    ps_lock: 'App lock', psd_lock: 'Open the app with fingerprint or face',
+    ps_hide: 'Hide money mode', psd_hide: "Hide the month's total with one tap",
+    shareTitle: 'Share the app', shareSub: 'Send it to friends or family so they can track too.', shareBtn: 'Share', copyLink: 'Copy link',
+    shareMsg: 'I use this app to see where my money goes each month: Money Tracking 👉', demoPro: 'Demo: view as a Pro member', demoTrialEnd: 'Demo: trial has ended', deleteBook: 'Delete this book', deleteBookConfirm: 'The book and all its expenses will be deleted for everyone. This cannot be undone. Delete?', demoTrialEndSub: 'See what a free user sees', aboutApp: 'About', privacy: 'Privacy note', aboutDev: 'Developer', devRole: 'Developer · Money Tracking', copyEmail: 'Copy email', devNote: 'Feedback, problems or a data-deletion request: write to this email.', madeBy: 'Made by', privacyBody: `<p><b>In short:</b> your expenses are yours. We never sell them, share them, or use them for ads.</p>
 <h4>What is stored</h4><ul><li><b>On your phone:</b> expenses, categories, targets and settings. Without signing in, everything stays only on your phone.</li>
 <li><b>In backup (if you sign in):</b> your email, expenses, categories, targets and settings are kept on Supabase servers (Singapore) so you can restore them on a new phone.</li>
 <li><b>If you buy Pro:</b> the bKash TrxID, your email and the last 4 digits of the sending number, only to verify the payment.</li></ul>
 <h4>Who can see it</h4><ul><li>Other users can't see your data.</li>
 <li>Backup data is not encrypted, so the developer can technically access it while running the server. It is only looked at to fix a problem.</li></ul>
 <h4>Other</h4><ul><li>No ads, no tracking.</li><li>If you pick an extra font, it downloads from Google Fonts.</li></ul>
-<h4>Deleting your data</h4><p>To remove data from your phone, sign out or clear the app's data. To delete your whole account including the backup, email the developer; it will be deleted.</p>`, taka: 'Taka', totalTaka: 'Total taka', bigRule: 'Over 40% of the total', bigOff: 'Hidden', fontBn: 'Bangla font', fontEn: 'English font', today: 'Today', yesterday: 'Yesterday', avgDay: 'Daily avg', streak: 'Streak',
+<h4>Deleting your data</h4><p>To remove data from your phone, sign out or clear the app's data. To delete your whole account including the backup, email the developer; it will be deleted within 7 days.</p>`, taka: 'Taka', totalTaka: 'Total taka', bigRule: 'Over 40% of the total', bigOff: 'Hidden', fontBn: 'Bangla font', fontEn: 'English font', today: 'Today', yesterday: 'Yesterday', avgDay: 'Daily avg', streak: 'Streak',
     backToNow: 'Back to this month',
     howMuch: 'How much did you spend?', notePh: 'Expense details', pickDate: 'Date', save: 'Save', more: 'More', newCat: 'New category',
     enterAmount: 'Enter an amount', pickCat: 'Pick a category', updated: 'Updated',
@@ -123,8 +173,8 @@ export const T = {
     targetsBody: 'Set a monthly limit only where you want to keep watch.', freeTargetsN: 'Free plan: {n} targets', saved: 'Saved',
     recBody: 'Rent, bills and other monthly costs get added automatically.', recEvery: 'Every month on day {d}', recNew: 'New recurring expense', recNotePh: 'Name (e.g. House rent)', recDay: 'Day', amount: 'Amount',
     recDelConfirm: 'Stop and delete this? Past expenses stay.',
-    proName: 'Pro', why_targets: 'The free plan has 3 targets', why_themes: 'This colour is in Pro', why_export: 'Export is in Pro', why_recurring: 'Recurring is in Pro',
-    pf_targets: 'Unlimited targets', pf_themes: '6 more colours', pf_export: 'Excel & PDF reports', pf_recurring: 'Recurring expenses added automatically', pf_fx: 'Extra animations',
+    proName: 'Pro', why_cats: 'The free plan has 20 categories', catCount: '{n}/{m} categories', why_themes: 'This colour is in Pro', why_export: 'Export is in Pro', why_recurring: 'Recurring is in Pro',
+    pf_cats: 'More than 20 categories', pf_themes: '13 more colours', pf_export: 'Excel & PDF reports', pf_recurring: 'Recurring expenses added automatically', pf_fx: 'Extra animations',
     oneTime: 'one time', payBkash: 'Pay with bKash', freeForever: 'Logging, charts and backup are always free', youArePro: "You're Pro!", thanks: 'Thanks for the support', done: 'Done',
     proActivated: 'Pro is on! 🎉',
     payPending: 'Being checked, usually within a few hours', payRejected: "The last TrxID didn't match. Send the correct one.",
@@ -199,6 +249,16 @@ export const THEMES = [
   { id: 'blue', bn: 'নীল', en: 'Blue', color: '#2563EB' },
   { id: 'teal', bn: 'টিল', en: 'Teal', color: '#0D9488' },
   { id: 'orange', bn: 'কমলা', en: 'Orange', color: '#EA580C' },
+  // new Pro colours — solid
+  { id: 'indigo', bn: 'ইন্ডিগো', en: 'Indigo', color: '#4F46E5', isNew: true },
+  { id: 'fuchsia', bn: 'ফুশিয়া', en: 'Fuchsia', color: '#C026D3', isNew: true },
+  { id: 'charcoal', bn: 'চারকোল', en: 'Charcoal', color: '#334155', isNew: true },
+  { id: 'coffee', bn: 'কফি', en: 'Coffee', color: '#92400E', isNew: true },
+  // new Pro colours — gradient (color → g)
+  { id: 'sunset', bn: 'সূর্যাস্ত', en: 'Sunset', color: '#F43F5E', g: '#F97316', free: true },
+  { id: 'ocean', bn: 'সমুদ্র', en: 'Ocean', color: '#0284C7', g: '#14B8A6', isNew: true },
+  { id: 'aurora', bn: 'অরোরা', en: 'Aurora', color: '#7C3AED', g: '#06B6D4', isNew: true },
+  { id: 'midnight', bn: 'মাঝরাত', en: 'Midnight', color: '#1E3A8A', g: '#7C3AED', isNew: true },
 ];
 
 export const EMOJI_GROUPS = [

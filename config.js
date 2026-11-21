@@ -15,10 +15,10 @@ export const BKASH_NUMBER = "01675291441";
 
 // 4) Pricing & limits
 export const PRO_PRICE = 89;        // ৳, one time. Must match supabase.sql (payments.amount check)
-export const TRIAL_DAYS = 7;        // counted from the day the app is first opened on the phone
-export const FREE_TARGETS = 3;
+export const TRIAL_DAYS = 15;       // counted from the day the app is first opened on the phone (also set in supabase.sql → trial_days)
+export const FREE_CATS = 20;   // categories allowed on the free plan (targets are unlimited & free)
 
 // 5) Payment method. "manual-bkash" now; later swap to a gateway module (see payments.js).
 export const PAYMENT_METHOD = "manual-bkash";
 
-export const APP_VERSION = "2.0.1";
+export const APP_VERSION = "2.1.0";

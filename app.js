@@ -59,8 +59,13 @@ const sum = a => a.reduce((s, e) => s + e.amt, 0);
 const inRange = (a, b, exBig = false) => all().filter(e => e.date >= a && e.date <= b && !(exBig && e.big));
 const inPeriod = (pk, exBig = false) => { const [a, b] = periodRange(pk); return inRange(a, b, exBig); };
 const byCat = arr => { const m = new Map(); arr.forEach(e => m.set(e.cat, (m.get(e.cat) || 0) + e.amt)); return m; };
-const cats = () => S.settings.cats;
+const cats = () => S.meta?.cats || S.settings.cats;
+const tgts = () => (S.meta ? (S.meta.targets ||= []) : S.settings.targets);
+const setTgts = v => { if (S.meta) S.meta.targets = v; else S.settings.targets = v; };
+const memberName = uid => { if (uid && uid === S.user?.uid) return t('me'); const m = S.meta?.members?.find(x => x.uid === uid); return m ? m.email.split('@')[0] : '—'; };
 const visCats = () => cats().filter(c => !c.hidden);
+// free plan: up to FREE_CATS categories (hidden ones count too); more needs Pro
+const catLimitHit = () => !isPro() && cats().length >= C.FREE_CATS;
 const cat = id => cats().find(c => c.id === id) || { id, bn: 'মুছে ফেলা', en: 'Removed', emoji: '❔', color: '#9CA3AF' };
 const catName = c => P.lang === 'bn' ? (c.bn || c.en) : (c.en || c.bn);
 const sortEntries = arr => arr.sort((a, b) => b.date.localeCompare(a.date) || (b.created || 0) - (a.created || 0));
@@ -89,15 +94,33 @@ function loadLocal() {
   S.entries = new Map(Object.entries(S.data.entries));
   if (!localStorage.getItem(LK.settings)) localStorage.setItem(LK.settings, JSON.stringify(st));
 }
+const bkeys = id => id === 'me' ? { data: LK.data, dirty: LK.dirty } : { data: 'tk_b_' + id, dirty: 'tk_bd_' + id, meta: 'tk_bm_' + id, mdirty: 'tk_bmd_' + id };
 let persistT = 0;
 function persist() {
   clearTimeout(persistT);
+  const k = bkeys(S.bookId), data = S.data, dirty = [...S.dirty];
   persistT = setTimeout(() => {
-    localStorage.setItem(LK.data, JSON.stringify(S.data));
-    localStorage.setItem(LK.dirty, JSON.stringify([...S.dirty]));
+    localStorage.setItem(k.data, JSON.stringify(data));
+    localStorage.setItem(k.dirty, JSON.stringify(dirty));
   }, 50);
 }
+function flushPersist() { clearTimeout(persistT); const k = bkeys(S.bookId); localStorage.setItem(k.data, JSON.stringify(S.data)); localStorage.setItem(k.dirty, JSON.stringify([...S.dirty])); }
+function saveMeta() { if (!S.meta) return; S.meta.updatedAt = Date.now(); const k = bkeys(S.bookId); localStorage.setItem(k.meta, JSON.stringify(S.meta)); localStorage.setItem(k.mdirty, '1'); }
+// switch between my own book and a shared family book
+function switchBook(id, quiet = false) {
+  if (S.bookId) flushPersist();
+  const k = bkeys(id);
+  const d = safe(localStorage.getItem(k.data), null);
+  S.bookId = id;
+  S.data = d && d.entries ? d : { entries: {}, deleted: {} }; S.data.deleted ||= {};
+  S.dirty = new Set(safe(localStorage.getItem(k.dirty), []));
+  S.meta = id === 'me' ? null : (safe(localStorage.getItem(k.meta), null) || { id, name: (S.books || []).find(b => b.id === id)?.name || t('sharedBook'), cats: S.settings.cats.map(c => ({ ...c })), targets: [], members: [] });
+  S.entries = new Map(Object.entries(S.data.entries));
+  localStorage.setItem('tk_active_book', id);
+  if (!quiet) { closeSheet(); render(); sync(); toast(id === 'me' ? t('myBook') : '📒 ' + S.meta.name); }
+}
 function saveSettings() {
+  if (S.meta) saveMeta();
   S.settings.updatedAt = Date.now();
   localStorage.setItem(LK.settings, JSON.stringify(S.settings));
   localStorage.setItem(LK.sdirty, '1');
@@ -120,13 +143,16 @@ function applyPrefs() {
   const r = document.documentElement;
   r.style.setProperty('--font', fontStack());
   r.style.setProperty('--accent', th.color);
+  r.style.setProperty('--accent2', th.g || th.color);
   r.style.setProperty('--on-accent', th.on || '#fff');
+  r.dataset.grad = th.g ? '1' : '';
   r.dataset.mode = P.mode; r.lang = P.lang;
   const m = $('meta[name=theme-color]'); if (m) m.content = th.color;
 }
 
 function putEntry(id, rec) {
   const e = { id, ...rec, updatedAt: Date.now() };
+  if (S.meta) e.by ||= S.user?.uid;
   S.data.entries[id] = e; delete S.data.deleted[id];
   S.entries.set(id, e); S.dirty.add(id);
   persist(); scheduleRender(); scheduleSync();
@@ -150,11 +176,11 @@ async function sync() {
     const ids = [...S.dirty];
     if (ids.length) {
       const recs = ids.map(id => S.data.entries[id] || { id, deleted: true, updatedAt: S.data.deleted[id] || Date.now() });
-      await store.push(recs);
+      if (S.meta) await store.pushBook(S.bookId, recs); else await store.push(recs);
       ids.forEach(id => S.dirty.delete(id)); persist();
     }
     // 2) pull everything, newest wins
-    const remote = await store.pull({ full: S.preferRemote || !S.entries.size });
+    const remote = S.meta ? await store.pullBook(S.bookId, { full: !S.entries.size }) : await store.pull({ full: S.preferRemote || !S.entries.size });
     let changed = false;
     for (const r of remote) {
       const local = S.data.entries[r.id], lts = local?.updatedAt || S.data.deleted[r.id] || 0;
@@ -168,7 +194,7 @@ async function sync() {
     // 3) settings
     const rs = await store.getSettings();
     if (rs && (S.preferRemote || rs.updatedAt > (S.settings.updatedAt || 0))) {
-      const keepCats = cats().filter(c => !rs.data.cats?.some(x => x.id === c.id) && all().some(e => e.cat === c.id));
+      const keepCats = S.settings.cats.filter(c => !rs.data.cats?.some(x => x.id === c.id) && (!S.meta && all().some(e => e.cat === c.id)));
       S.settings = rs.data; S.settings.cats = [...(rs.data.cats || []), ...keepCats];
       S.settings.updatedAt = rs.updatedAt; P = S.settings.prefs;
       localStorage.setItem(LK.settings, JSON.stringify(S.settings)); localStorage.removeItem(LK.sdirty);
@@ -177,12 +203,26 @@ async function sync() {
       await store.putSettings(S.settings, S.settings.updatedAt || Date.now());
       localStorage.removeItem(LK.sdirty);
     }
+    // 4) shared book: members, name, its categories & targets
+    if (S.meta) {
+      const info = await store.bookInfo(S.bookId);
+      if (!info) { const old = S.bookId; dropBookLocal(old); switchBook('me', true); toast(t('removedFromBook'), { type: 'warn' }); changed = true; }
+      else {
+        const k = bkeys(S.bookId);
+        Object.assign(S.meta, { name: info.name, owner: info.owner, code: info.code, members: info.members });
+        if (localStorage.getItem(k.mdirty) && (S.meta.updatedAt || 0) >= (info.meta?.updatedAt || 0)) { await store.putBookMeta(S.bookId, { cats: S.meta.cats, targets: S.meta.targets, updatedAt: S.meta.updatedAt }); localStorage.removeItem(k.mdirty); }
+        else if (info.meta && (info.meta.updatedAt || 0) > (S.meta.updatedAt || 0)) { S.meta.cats = info.meta.cats; S.meta.targets = info.meta.targets || []; S.meta.updatedAt = info.meta.updatedAt; changed = true; }
+        localStorage.setItem(k.meta, JSON.stringify(S.meta));
+      }
+    }
+    if (S.user) { try { S.books = await store.myBooks(); localStorage.setItem('tk_books', JSON.stringify(S.books)); } catch { } }
     S.preferRemote = false;
     S.lastSync = Date.now();
     if (changed) { runRecurring(); scheduleRender(); }
   } catch (e) { console.warn('sync later', e); }
   finally { S.syncing = false; refreshSyncBadge(); }
 }
+function dropBookLocal(id) { const k = bkeys(id); [k.data, k.dirty, k.meta, k.mdirty].forEach(x => localStorage.removeItem(x)); S.books = (S.books || []).filter(b => b.id !== id); localStorage.setItem('tk_books', JSON.stringify(S.books)); }
 function refreshSyncBadge() { const b = $('#syncState'); if (b) b.innerHTML = syncLabel(); }
 function syncLabel() {
   if (!S.user) return t('backupOff');
@@ -193,12 +233,15 @@ function syncLabel() {
 
 /* ───────── pro / trial ───────── */
 function proState() {
-  if (S.profile?.pro) return { s: 'pro' };
+  if (S.profile?.pro || (isDemo && localStorage.getItem('tk_demo_pro') === '1')) return { s: 'pro', since: S.profile?.proSince };
+  if (isDemo && localStorage.getItem('tk_demo_trial_end') === '1') return { s: 'free' };   // demo: see what a free user sees
   const left = Math.ceil((S.settings.firstOpen + C.TRIAL_DAYS * 864e5 - Date.now()) / 864e5);
   return left > 0 ? { s: 'trial', left } : { s: 'free' };
 }
 const isPro = () => proState().s !== 'free';
-const activeTargets = () => S.settings.targets.slice(0, isPro() ? 999 : C.FREE_TARGETS);
+// "Pro" tag shows for trial + free users; only paid Pro members never see it
+const proTag = () => proState().s === 'pro' ? '' : '<em class="ptag">Pro</em>';
+const activeTargets = () => tgts();   // targets are free & unlimited
 function enforceFree() { if (!isPro()) { const th = THEMES.find(x => x.id === P.theme); if (th && !th.free) setPref('theme', 'red'); } }
 
 /* ───────── UI plumbing ───────── */
@@ -270,8 +313,13 @@ function askConfirm(msg, okText, danger = true) {
 /* ───────── boot ───────── */
 async function boot() {
   loadLocal(); applyPrefs();
+  S.bookId = 'me'; S.meta = null; S.books = safe(localStorage.getItem('tk_books'), []);
+  const ab = localStorage.getItem('tk_active_book');
+  if (ab && ab !== 'me' && S.books.some(b => b.id === ab)) switchBook(ab, true);
   S.period = periodOf(todayStr()); S.year = +S.period.slice(0, 4);
+  S.hidden = !!(P.hideBtn && isPro());          // "hide money" mode starts hidden if turned on
   showApp();
+  if (lockCfg()) showLock();
   attachSwipe($('#root'), dir => {
     if (S.view !== 'calendar' || S.sheet || $('.modal-wrap')) return;
     S.period = shiftPeriod(S.period, dir); render();
@@ -282,7 +330,12 @@ async function boot() {
   store.onAuth(onAuth);
   runRecurring(); checkBadges(true);
   setInterval(() => { if (!document.hidden) sync(); }, 60000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { sync(); scheduleRender(); } });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { S.bgAt = Date.now(); return; }
+    const lc = lockCfg();
+    if (lc && S.bgAt && Date.now() - S.bgAt >= lc.after * 1000) showLock();
+    sync(); scheduleRender();
+  });
   addEventListener('online', () => sync());
 }
 
@@ -330,7 +383,7 @@ function periodNav() {
 const catIcon = (c, sm = '') => `<span class="eic ${sm}" style="--c:${c.color}">${c.emoji}</span>`;
 function entryRow(e, withDate = false) {
   const c = cat(e.cat), title = e.note || catName(c);
-  const sub = [withDate ? dShort(e.date) : '', e.note ? esc(catName(c)) : ''].filter(Boolean).join(' · ');
+  const sub = [withDate ? dShort(e.date) : '', e.note ? esc(catName(c)) : '', S.meta && e.by ? `👤 ${esc(memberName(e.by))}` : ''].filter(Boolean).join(' · ');
   const tags = (e.rec ? `<span class="tg">${t('tagRec')}</span>` : '');
   return `<button class="erow" data-a="edit" data-id="${e.id}">${catIcon(c)}
     <span class="etx"><b>${esc(title)}</b>${sub || tags ? `<small>${sub}${tags}</small>` : ''}</span>
@@ -354,9 +407,10 @@ function targetInfo(catId, pk) {
 /* ───────── HOME ───────── */
 function vHome() {
   const pk = S.period, es = inPeriod(pk), total = sum(es), td = todayStr(), ps = proState();
-  let h = `<header class="top">${periodNav()}</header>
+  let h = `<header class="top home-top"><div class="app-tag">${t('appName')}</div>${periodNav()}</header>
   <div class="content">
-    <section class="summary"><small>${t('spentThisPeriod')}</small><div class="big-amt" id="bigAmt">${fmt(total)}</div><small class="unit">${t('taka')}</small></section>`;
+    ${bookChip()}
+    <section class="summary">${P.hideBtn && isPro() ? `<button class="eye" data-a="toggleHide" aria-label="hide">${S.hidden ? I.eyeOff : I.eye}</button>` : ''}<small>${t('spentThisPeriod')}</small><div class="big-amt ${S.hidden ? 'masked' : ''}" id="bigAmt">${S.hidden ? '•••••' : fmt(total)}</div><small class="unit">${t('taka')}</small></section>`;
 
   if (ps.s === 'trial' && ps.left <= 2) h += `<button class="note-card warn" data-a="pay">${I.crown}<span>${t('trialEnding', { d: dg(ps.left) })}</span>${I.chev}</button>`;
   if (S.payments.some(p => p.status === 'pending')) h += `<div class="note-card">⏳ <span>${t('payPendingShort')}</span></div>`;
@@ -373,10 +427,10 @@ function vHome() {
 
 /* ───────── CHARTS ───────── */
 function vCharts() {
-  const tabs = ['cat', 'month', 'year', 'compare'];
+  const tabs = ['cat', 'month', 'year', 'compare', 'insights'];
   let h = `<header class="top">${S.chartTab === 'year' ? `<div class="pnav"><button class="ib" data-a="yshift" data-v="-1">${I.left}</button><div class="pt"><b>${dg(S.year)}</b></div><button class="ib" data-a="yshift" data-v="1">${I.right}</button></div>` : periodNav()}</header>
-  <div class="content"><div class="seg">${tabs.map(x => `<button class="${S.chartTab === x ? 'on' : ''}" data-a="ctab" data-v="${x}">${t('ct_' + x)}</button>`).join('')}</div>`;
-  h += ({ month: cMonth, year: cYear, cat: cCat, compare: cCompare })[S.chartTab]();
+  <div class="content"><div class="seg">${tabs.map(x => `<button class="${S.chartTab === x ? 'on' : ''}" data-a="ctab" data-v="${x}">${t('ct_' + x)}${x === 'insights' && proState().s === 'trial' ? ' 👑' : ''}</button>`).join('')}</div>`;
+  h += ({ month: cMonth, year: cYear, cat: cCat, compare: cCompare, insights: cInsights })[S.chartTab]();
   h += `<button class="btn soft wide" data-a="monthCard">${I.share} ${t('monthCard')}</button>`;
   return h + `</div>`;
 }
@@ -425,7 +479,8 @@ function cCat() {
     </button>`;
   });
   h += `</div>`;
-  if (!S.settings.targets.length) h += `<button class="note-card" data-a="targets">${I.target}<span><b>${t('setTargetsTitle')}</b><small>${t('setTargetsBody')}</small></span>${I.chev}</button>`;
+  if (S.meta) h += whoSpent(es);
+  if (!tgts().length) h += `<button class="note-card" data-a="targets">${I.target}<span><b>${t('setTargetsTitle')}</b><small>${t('setTargetsBody')}</small></span>${I.chev}</button>`;
   return h;
 }
 function cCompare() {
@@ -480,18 +535,20 @@ function vMe() {
     h += `<div class="card backup"><div class="bk-ic">${I.cloud}</div><div class="grow"><b>${t('backupTitle')}</b><small>${t('backupSub')}</small></div><button class="btn primary sm" data-a="backup">${t('signIn')}</button></div>`;
   }
   if (ps.s !== 'pro') h += `<button class="card pro-card" data-a="pay"><div class="bk-ic gold">${I.crown}</div><span class="grow"><b>${t('proTitle', { p: dg(C.PRO_PRICE) })}</b><small>${ps.s === 'trial' ? t('trialLeft', { d: dg(ps.left) }) : t('proSub')}</small></span>${I.chev}</button>`;
-  else h += `<div class="card pro-card">${I.crown}<b class="grow">${t('proMember')}</b></div>`;
+  else h += `<button class="card pro-card" data-a="proBenefits"><div class="bk-ic gold">${I.crown}</div><span class="grow"><b>${t('proMember')} 👑</b><small>${t('seeBenefits')}</small></span>${I.chev}</button>`;
 
   h += `<div class="sec-h"><h3>${t('mySetup')}</h3></div><div class="card list">
     ${meRow(I.search, t('searchExp'), '', 'search')}
-    ${meRow(I.target, t('targets'), dg(S.settings.targets.length), 'targets')}
-    ${meRow(I.tag, t('categories'), dg(visCats().length), 'cats')}
-    ${meRow(I.repeat, t('recurring'), (isPro() ? '' : 'Pro · ') + dg(S.settings.recurring.length), 'recurring')}
-    ${meRow(I.download, t('export'), isPro() ? 'Excel · PDF' : 'Pro', 'export')}
+    ${meRow(I.users, t('sharedBook'), S.books?.[0] ? esc(S.books[0].name) : proTag(), 'shared')}
+    ${meRow(I.target, t('targets'), dg(tgts().length), 'targets')}
+    ${meRow(I.tag, t('categories'), proState().s === 'pro' ? dg(visCats().length) : dg(cats().length) + '/' + dg(C.FREE_CATS), 'cats')}
+    ${meRow(I.repeat, t('recurring'), proTag() + (isPro() ? dg(S.settings.recurring.length) : ''), 'recurring')}
+    ${meRow(I.download, t('export'), proTag() + (isPro() ? 'Excel · PDF' : ''), 'export')}
     ${meRow(I.daystart, t('monthStart'), t('monthStartV', { d: dg(mStart()) }), 'monthStart')}
   </div>
   <div class="sec-h"><h3>${t('looks')}</h3></div><div class="card list">
-    ${meRow(I.palette, t('theme'), `<i class="swatch" style="background:var(--accent)"></i>`, 'theme')}
+    ${meRow(I.palette, t('theme'), `<i class="swatch" style="background:var(--accent-bg)"></i>`, 'theme')}
+    <label class="lrow toggle-row">${I.eye}<span class="grow"><span>${t('hideBtnSet')} ${proTag()}</span><small class="muted">${isPro() ? t('hideBtnSub') : ''}</small></span><input type="checkbox" data-a="hideBtn" ${P.hideBtn && isPro() ? 'checked' : ''}><span class="sw"></span></label>
     <div class="lrow">${I.moon}<span class="grow">${t('mode')}</span><div class="seg mini">${['light', 'dark', 'system'].map(m => `<button class="${P.mode === m ? 'on' : ''}" data-a="mode" data-v="${m}">${t('mode_' + m)}</button>`).join('')}</div></div>
     <div class="lrow">${I.globe}<span class="grow">${t('language')}</span><div class="seg mini"><button class="${P.lang === 'bn' ? 'on' : ''}" data-a="lang" data-v="bn">বাংলা</button><button class="${P.lang === 'en' ? 'on' : ''}" data-a="lang" data-v="en">English</button></div></div>
     ${meRow(I.type, t('fontBn'), esc((FONTS_BN.find(f => f.id === P.fontBn) || FONTS_BN[0]).name), 'fontBn')}
@@ -499,10 +556,17 @@ function vMe() {
     <div class="lrow">${I.hash}<span class="grow">${t('digits')}</span><div class="seg mini"><button class="${bnDigits() ? 'on' : ''}" data-a="digits" data-v="bn">১২৩</button><button class="${!bnDigits() ? 'on' : ''}" data-a="digits" data-v="en">123</button></div></div>
   </div>
   <div class="sec-h"><h3>${t('badges')}</h3></div><div class="badges">${bd.map(b => `<div class="badge ${b.n ? '' : 'locked'}"><span>${b.ic}</span><b>${b.name}</b><small>${b.n ? (b.count ? '×' + dg(b.n) : '✓') : b.hint}</small></div>`).join('')}</div>
+  <div class="sec-h"><h3>${t('security')}</h3></div><div class="card list">
+    <label class="lrow toggle-row">${I.finger}<span class="grow"><span>${t('appLock')} ${proTag()}</span><small class="muted">${isPro() ? t('appLockSub') : ''}</small></span><input type="checkbox" data-a="lockToggle" ${lockCfg() ? 'checked' : ''}><span class="sw"></span></label>
+    ${lockCfg() ? `<div class="lrow"><span class="grow small">${t('lockAfter')}</span><div class="seg mini">${[0, 60, 300].map(v => `<button class="${lockCfg().after === v ? 'on' : ''}" data-a="lockAfter" data-v="${v}">${t('la_' + v)}</button>`).join('')}</div></div>` : ''}
+  </div>
   <div class="sec-h"><h3>${t('aboutApp')}</h3></div><div class="card list">
     ${meRow(I.shield, t('privacy'), '', 'privacy')}
     ${meRow(I.user, t('aboutDev'), esc(DEVELOPER.name), 'aboutDev')}
   </div>
+  ${shareCard()}
+  ${isDemo ? `<label class="toggle-line demo-pro"><input type="checkbox" data-a="demoPro" ${localStorage.getItem('tk_demo_pro') === '1' ? 'checked' : ''}><span class="sw"></span><span class="grow">${t('demoPro')}</span></label>
+  <label class="toggle-line demo-pro"><input type="checkbox" data-a="demoTrialEnd" ${localStorage.getItem('tk_demo_trial_end') === '1' ? 'checked' : ''}><span class="sw"></span><span class="grow">${t('demoTrialEnd')}<small class="muted">${t('demoTrialEndSub')}</small></span></label>` : ''}
   ${S.user && store.isAdmin() ? `<a class="btn soft wide" href="admin.html">${t('adminPage')}</a>` : ''}
   ${S.user ? `<button class="btn soft wide danger-t" data-a="logout">${I.logout} ${t('logout')}</button>` : ''}
   <p class="hint">${t('appName')} · v${C.APP_VERSION}${isDemo ? ' · demo' : ''} · ${t('madeBy')} ${esc(DEVELOPER.name)}</p></div>`;
@@ -554,7 +618,7 @@ function celebrate(rec, before) {
   checkBadges();
 }
 function runRecurring() {
-  if (!isPro() || !S.settings.recurring.length) return;
+  if (!isPro() || !S.settings.recurring.length || S.meta) return;   // recurring only in my own book
   const td = todayStr(), { y, m } = parse(td);
   for (const r of S.settings.recurring) {
     if (!r.active) continue;
@@ -595,6 +659,7 @@ function addHTML() {
   const td = todayStr(), yd = addDays(td, -1), other = A.date !== td && A.date !== yd;
   return `<div class="add ${A.id ? 'editing' : ''}">
     ${A.id ? `<div class="edit-banner">${I.edit}<span>${t('editingOld')}</span></div>` : ''}
+    ${S.meta ? `<div class="book-line">📒 ${esc(S.meta.name)}</div>` : ''}
     <div class="add-head">
       <div class="chips dates"><button class="chip ${A.date === td ? 'on' : ''}" data-a="adate" data-v="${td}">${t('today')}</button><button class="chip ${A.date === yd ? 'on' : ''}" data-a="adate" data-v="${yd}">${t('yesterday')}</button>
         <button class="chip ${other ? 'on' : ''}" data-a="pickDate">${I.cal}<span>${other ? dShort(A.date) : t('pickDate')}</span></button></div>
@@ -700,6 +765,7 @@ function openEntryActions(id) {
 /* ───────── category editor (modal on top of any sheet) ───────── */
 function openCatEditor(id = null, onDone = null) {
   const c = id ? cat(id) : null;
+  if (!c && catLimitHit()) return openPaywall('cats');
   let emoji = c?.emoji || '🏷️', name = c ? catName(c) : '';
   const used = new Set(cats().map(x => (x.en || '').toLowerCase()));
   const presets = PRESETS.filter(p => !used.has(p.en.toLowerCase()));
@@ -781,7 +847,7 @@ function doSearch(q) {
 
 /* ───────── targets ───────── */
 function openTargets() {
-  const tg = S.settings.targets, lim = isPro() ? 0 : C.FREE_TARGETS;
+  const tg = tgts(), lim = 0;
   openSheet(`<h3>${t('targets')}</h3><p class="muted small">${t('targetsBody')}</p>
     ${lim ? `<p class="pill">${t('freeTargetsN', { n: dg(lim) })}</p>` : ''}
     <div class="card list">${visCats().map(c => {
@@ -791,18 +857,17 @@ function openTargets() {
     }).join('')}</div><button class="btn primary wide" data-a="saveTargets">${t('save')}</button>`, 'targets', 'tall');
 }
 function saveTargets() {
-  const old = S.settings.targets, next = [], since = periodOf(todayStr());
+  const old = tgts(), next = [], since = periodOf(todayStr());
   const vals = new Map($$('[data-tcat]').map(i => [i.dataset.tcat, Math.round(+i.value || 0)]));
   old.forEach(x => { const v = vals.get(x.cat); if (v > 0) next.push({ cat: x.cat, amt: v, since: x.since || since }); vals.delete(x.cat); });
   vals.forEach((v, k) => { if (v > 0) next.push({ cat: k, amt: v, since }); });
-  const overLimit = !isPro() && next.length > C.FREE_TARGETS && next.length > old.length;
-  S.settings.targets = next; saveSettings(); closeSheet(); render();
-  if (overLimit) setTimeout(() => openPaywall('targets'), 300); else toast(t('saved'));
+  setTgts(next); saveSettings(); closeSheet(); render(); toast(t('saved'));
 }
 
 /* ───────── categories list ───────── */
 function openCats() {
   openSheet(`<h3>${t('categories')}</h3><p class="muted small">${t('catsBody')}</p>
+    ${proState().s !== 'pro' ? `<p class="pill">${t('catCount', { n: dg(cats().length), m: dg(C.FREE_CATS) })} ${proTag()}</p>` : ''}
     <div class="card list">${cats().map(c => `<button class="lrow ${c.hidden ? 'dim' : ''}" data-a="editCat" data-id="${c.id}">${catIcon(c, 'sm')}<span class="grow">${esc(catName(c))}${c.hidden ? `<small class="muted">${t('hidden')}</small>` : ''}</span><span class="chev">${I.chev}</span></button>`).join('')}</div>
     <button class="btn primary wide" data-a="newCatList">${I.plus} ${t('newCat')}</button>`, 'cats', 'tall');
 }
@@ -829,10 +894,14 @@ function openRecurring() {
 
 /* ───────── theme ───────── */
 function openTheme() {
-  openSheet(`<h3>${t('theme')}</h3><div class="themes">${THEMES.map(th => {
+  const member = proState().s === 'pro';
+  const sw = th => {
     const locked = !th.free && !isPro();
-    return `<button class="th ${P.theme === th.id ? 'on' : ''}" data-a="setTheme" data-v="${th.id}"><span class="dot-lg" style="background:${th.color}">${locked ? '🔒' : P.theme === th.id ? I.check : ''}</span><small>${th[P.lang]}</small>${th.free ? '' : '<em>PRO</em>'}</button>`;
-  }).join('')}</div>
+    const bg = th.g ? `linear-gradient(135deg, ${th.color}, ${th.g})` : th.color;
+    return `<button class="th ${P.theme === th.id ? 'on' : ''}" data-a="setTheme" data-v="${th.id}"><span class="dot-lg" style="background:${bg}">${locked ? '🔒' : P.theme === th.id ? I.check : ''}</span><small>${th[P.lang]}</small>${th.free || member ? '' : '<em>PRO</em>'}</button>`;
+  };
+  const groups = [['themesFree', THEMES.filter(x => x.free)], ['themesPro', THEMES.filter(x => !x.free)]];
+  openSheet(`<h3>${t('theme')}</h3>${groups.map(([k, list]) => `<h4>${t(k)}</h4><div class="themes">${list.map(sw).join('')}</div>`).join('')}
   <div class="seg">${['light', 'dark', 'system'].map(m => `<button class="${P.mode === m ? 'on' : ''}" data-a="mode" data-v="${m}">${t('mode_' + m)}</button>`).join('')}</div>`, 'theme');
 }
 
@@ -880,27 +949,179 @@ const authErr = e => {
   return t(map[e?.code] || 'errGeneric');
 };
 
+/* ───────── book switcher & shared family book ───────── */
+// one shared book per person → a single tap swaps between "my book" and the shared book
+function bookChip() {
+  const b = S.user && S.books?.[0]; if (!b) return '';
+  return `<button class="book-switch" data-a="bookSwap" aria-label="${t('swapBook')}">
+    <span class="${!S.meta ? 'on' : ''}">👤 ${t('myBook')}</span><span class="swap-ic">${I.swap}</span><span class="${S.meta ? 'on' : ''}">📒 ${esc(b.name)}</span></button>`;
+}
+function openBookPick() {
+  openSheet(`<h3>${t('pickBook')}</h3><div class="card list">
+    <button class="lrow ${!S.meta ? 'on-row' : ''}" data-a="goBook" data-v="me">👤<span class="grow"><b>${t('myBook')}</b><small class="muted">${t('myBookSub')}</small></span>${!S.meta ? I.check : ''}</button>
+    ${S.books.map(b => `<button class="lrow ${S.bookId === b.id ? 'on-row' : ''}" data-a="goBook" data-v="${b.id}">📒<span class="grow"><b>${esc(b.name)}</b><small class="muted">${t('nMembers', { n: dg(b.members.length) })}</small></span>${S.bookId === b.id ? I.check : ''}</button>`).join('')}
+  </div><button class="btn soft wide" data-a="shared">${t('manageBooks')}</button>`, 'bookpick');
+}
+function openShared() {
+  if (!S.user) return openBackup(openShared);
+  const books = S.books || [];
+  if (books.length) return openBookDetail(books[0].id);
+  openSheet(`<h3>${t('sharedBook')}</h3><p class="muted small">${t('sharedIntro')}</p>
+    ${books.length ? `<div class="card list">${books.map(b => `<button class="lrow" data-a="bookDetail" data-v="${b.id}">📒<span class="grow"><b>${esc(b.name)}</b><small class="muted">${t('nMembers', { n: dg(b.members.length) })}${b.owner === S.user.uid ? ' · ' + t('owner') : ''}</small></span><span class="chev">${I.chev}</span></button>`).join('')}</div>` : ''}
+    <div class="card form"><b>${t('createBook')}</b><small class="muted">${isPro() ? t('createBookSub') : t('createBookPro')}</small>
+      <input id="bkName" placeholder="${t('bookNamePh')}" value="${t('familyBook')}" maxlength="30"><button class="btn primary" data-a="createBook">${isPro() ? '' : '👑 '}${t('createBtn')}</button></div>
+    <div class="card form"><b>${t('joinBook')}</b><small class="muted">${t('joinBookSub')}</small>
+      <input id="bkCode" placeholder="K7P2QX" maxlength="6" autocapitalize="characters" autocomplete="off" class="code-in"><p class="err" id="bkErr"></p><button class="btn soft" data-a="joinBook">${t('joinBtn')}</button></div>`, 'shared', 'tall');
+}
+function openBookDetail(id) {
+  const b = (S.books || []).find(x => x.id === id); if (!b) return openShared();
+  const own = b.owner === S.user.uid;
+  openSheet(`<div class="sheet-h"><span class="eic" style="--c:var(--accent)">📒</span><div class="grow"><h3>${esc(b.name)}</h3><small class="muted">${own ? t('owner') : t('member')}</small></div></div>
+    ${own ? `<div class="card code-card"><small class="muted">${t('inviteCode')}</small><div class="code">${esc(b.code)}</div>
+      <div class="row gap"><button class="btn soft grow" data-a="copyText" data-v="${esc(b.code)}">${t('copy')}</button><button class="btn primary grow" data-a="shareCode" data-v="${esc(b.code)}">${t('share')}</button></div></div>` : ''}
+    <h4>${t('members')}</h4><div class="card list">${b.members.map(m => `<div class="lrow"><span class="avatar-sm">${esc(m.email[0].toUpperCase())}</span><span class="grow"><b>${esc(m.uid === S.user.uid ? t('me') : m.email.split('@')[0])}</b><small class="muted">${esc(m.email)}${m.uid === b.owner ? ' · ' + t('owner') : ''}</small></span>
+      ${own && m.uid !== b.owner ? `<button class="ib sm danger-t" data-a="kick" data-v="${id}" data-u="${m.uid}">${I.x}</button>` : ''}</div>`).join('')}</div>
+    <button class="btn primary wide" data-a="goBook" data-v="${id}">${t('openBook')}</button>
+    ${isDemo && own ? `<button class="btn soft wide" data-a="demoPartner" data-v="${id}">${t('demoPartner')}</button>` : ''}
+    ${!own ? `<button class="btn soft wide danger-t" data-a="leaveBook" data-v="${id}">${t('leaveBook')}</button>` : `<button class="btn soft wide danger-t" data-a="deleteBook" data-v="${id}">${t('deleteBook')}</button>`}`, 'bookdetail', 'tall');
+}
+function whoSpent(es) {
+  const m = new Map(); es.forEach(e => m.set(e.by || '', (m.get(e.by || '') || 0) + e.amt));
+  const list = [...m].sort((a, b) => b[1] - a[1]), max = list[0]?.[1] || 1, total = sum(es) || 1;
+  return `<div class="sec-h"><h3>${t('whoSpent')}</h3></div><div class="card legend-bars">${list.map(([uid, v]) => `<div class="lb"><span class="lb-top"><span class="avatar-sm">${esc(memberName(uid)[0] || '?')}</span><span class="lb-name">${esc(memberName(uid))}</span><b>${fmt(v)}</b><small>${dg(Math.round(v / total * 100))}%</small></span>
+    <span class="lb-track"><i style="width:${(v / max * 100).toFixed(1)}%;background:var(--accent-bg)"></i></span></div>`).join('')}</div>`;
+}
+
+/* ───────── monthly insights (Pro) ───────── */
+function cInsights() {
+  if (!isPro()) return `<div class="card insight-lock"><div class="crown">${I.crown}</div><b>${t('ps_insights')}</b><p class="muted small">${t('psd_insights')}</p><button class="btn primary" data-a="pay">${t('getPro')}</button></div>`;
+  const pk = S.period, [a, b] = periodRange(pk), td = todayStr(), isCur = td >= a && td <= b, es = inPeriod(pk);
+  if (!es.length) return `<div class="empty"><p>${t('noData')}</p></div>`;
+  const total = sum(es), n = diffDays(a, b) + 1, end = isCur ? td : b, elapsed = diffDays(a, end) + 1, cards = [];
+  if (isCur && elapsed >= 3 && elapsed < n) cards.push(['📈', t('in_proj', { a: fmt(Math.round(total / elapsed * n / 100) * 100) })]);
+  const [pa, pb] = periodRange(shiftPeriod(pk, -1)), pe = addDays(pa, elapsed - 1) > pb ? pb : addDays(pa, elapsed - 1);
+  const A = byCat(es.filter(e => e.date <= end)), B = byCat(inRange(pa, pe));
+  const ch = [...new Set([...A.keys(), ...B.keys()])].map(id => [id, (A.get(id) || 0), (B.get(id) || 0)]).filter(x => x[2] > 0);
+  const up = ch.filter(x => x[1] > x[2]).sort((x, y) => (y[1] - y[2]) - (x[1] - x[2]))[0];
+  const down = ch.filter(x => x[1] < x[2]).sort((x, y) => (x[1] - x[2]) - (y[1] - y[2]))[0];
+  if (up) cards.push(['⬆️', t('in_up', { c: catName(cat(up[0])), p: dg(Math.round((up[1] - up[2]) / up[2] * 100)), a: fmt(up[1] - up[2]) })]);
+  if (down) cards.push(['⬇️', t('in_down', { c: catName(cat(down[0])), p: dg(Math.round((down[2] - down[1]) / down[2] * 100)), a: fmt(down[2] - down[1]) })]);
+  const wd = Array(7).fill(0); es.forEach(e => { wd[dow(e.date)] += e.amt; });
+  const wmax = wd.indexOf(Math.max(...wd)); if (wd[wmax] > 0) cards.push(['📅', t('in_wday', { d: WDAYS[P.lang][wmax], a: fmt(wd[wmax]) })]);
+  const days = new Set(es.map(e => e.date)), zero = elapsed - [...days].filter(d => d <= end).length;
+  cards.push(zero > 0 ? ['🌿', t('in_zero', { n: dg(zero) })] : ['🔥', t('in_nozero')]);
+  const nm = new Map(); es.forEach(e => { if (e.note) nm.set(e.note, (nm.get(e.note) || 0) + e.amt); });
+  const topN = [...nm].sort((x, y) => y[1] - x[1])[0]; if (topN) cards.push(['🏷️', t('in_note', { n: esc(topN[0]), a: fmt(topN[1]) })]);
+  const bigE = [...es].sort((x, y) => y.amt - x.amt)[0];
+  cards.push(['💸', t('in_big', { n: esc(bigE.note || catName(cat(bigE.cat))), a: fmt(bigE.amt), d: dShort(bigE.date) })]);
+  return `<p class="hint">${isCur ? t('in_sub', { d: dg(elapsed) }) : periodTitle(pk)}</p>` + cards.map(([ic, txt], i) => `<div class="card insight" style="animation-delay:${i * 60}ms"><span class="in-ic">${ic}</span><p>${txt}</p></div>`).join('');
+}
+
+/* ───────── app lock (fingerprint / face via the phone's own lock) ───────── */
+const lockCfg = () => safe(localStorage.getItem('tk_lock'), null);
+const rnd = n => crypto.getRandomValues(new Uint8Array(n));
+const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const unb64u = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+async function bioAvailable() { try { return !!window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable(); } catch { return false; } }
+async function enableLock() {
+  if (!isPro()) return openPaywall();
+  let cred = null;
+  if (await bioAvailable()) {
+    try {
+      const c = await navigator.credentials.create({ publicKey: { challenge: rnd(32), rp: { name: 'Taka Jay Koi' }, user: { id: rnd(16), name: 'taka-user', displayName: t('appName') },
+        pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }], authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'discouraged' }, timeout: 60000, attestation: 'none' } });
+      cred = b64u(c.rawId);
+    } catch (e) { console.warn(e); if (e.name === 'NotAllowedError' && !isDemo) { toast(t('lockCancelled')); return render(); } }
+  }
+  if (!cred) {
+    if (!isDemo) { toast(t('lockUnavailable'), { type: 'warn' }); return render(); }
+    if (!await askConfirm(t('lockDemoAsk'), t('yes'), false)) return render();
+    cred = 'demo';
+  }
+  localStorage.setItem('tk_lock', JSON.stringify({ cred, after: 60 })); toast(t('lockOn')); render();
+}
+async function disableLock() {
+  if (!await verifyLock()) return render();
+  localStorage.removeItem('tk_lock'); toast(t('lockOff')); render();
+}
+async function verifyLock() {
+  const lc = lockCfg(); if (!lc) return true;
+  if (lc.cred === 'demo') { await new Promise(r => setTimeout(r, 500)); return true; }
+  try { await navigator.credentials.get({ publicKey: { challenge: rnd(32), allowCredentials: [{ type: 'public-key', id: unb64u(lc.cred), transports: ['internal'] }], userVerification: 'required', timeout: 60000 } }); return true; }
+  catch (e) { console.warn(e); return false; }
+}
+function showLock() {
+  if ($('#lock')) return;
+  const d = document.createElement('div'); d.id = 'lock';
+  d.innerHTML = `<img class="app-logo" src="icons/icon.svg" alt=""><h2>${t('appName')}</h2><p class="muted">${t('lockedMsg')}</p>
+    <button class="finger" data-unlock="1">${I.finger}</button><button class="btn primary" data-unlock="1">${t('unlockBtn')}</button><p class="err" id="lockErr"></p>`;
+  d.addEventListener('click', async e => {
+    if (!e.target.closest('[data-unlock]')) return;
+    d.classList.add('checking');
+    if (await verifyLock()) { d.classList.add('out'); setTimeout(() => d.remove(), 250); }
+    else { d.classList.remove('checking'); $('#lockErr').textContent = t('unlockFail'); }
+  });
+  document.body.appendChild(d);
+}
+
+/* ───────── share the app ───────── */
+const appLink = () => location.origin + location.pathname.replace(/(index|admin)\.html$/, '');
+function shareCard() {
+  const url = encodeURIComponent(appLink()), msg = encodeURIComponent(t('shareMsg') + ' ' + appLink());
+  const ext = [
+    ['WhatsApp', '#25D366', `https://wa.me/?text=${msg}`],
+    ['Facebook', '#1877F2', `https://www.facebook.com/sharer/sharer.php?u=${url}`],
+    ['Messenger', '#0084FF', `fb-messenger://share/?link=${url}`],
+    ['Telegram', '#229ED9', `https://t.me/share/url?url=${url}&text=${encodeURIComponent(t('shareMsg'))}`],
+  ];
+  return `<div class="sec-h"><h3>${t('shareTitle')}</h3></div><div class="card share-card">
+    <p class="muted small">${t('shareSub')}</p>
+    <button class="btn primary wide" data-a="shareNative">${I.share} ${t('shareBtn')}</button>
+    <div class="share-row">${ext.map(([n, c, href]) => `<a class="share-ic" href="${href}" target="_blank" rel="noopener"><span style="background:${c}">${n[0]}</span><small>${n}</small></a>`).join('')}
+      <button class="share-ic" data-a="copyText" data-v="${esc(appLink())}"><span class="copy">${I.link}</span><small>${t('copyLink')}</small></button></div></div>`;
+}
+
 /* ───────── privacy note & about the developer ───────── */
 function openPrivacy() {
   openSheet(`<h3>${t('privacy')}</h3><div class="prose">${t('privacyBody')}</div>
     <button class="btn primary wide" data-a="closeSheet">${t('done')}</button>`, 'privacy', 'tall');
 }
 function openAboutDev() {
-  openSheet(`<div class="about"><div class="dev-av">${esc(DEVELOPER.name.split(' ').map(w => w[0]).slice(0, 2).join(''))}</div>
-    <h3 class="center">${esc(DEVELOPER.name)}</h3><p class="muted small center">${t('devRole')}</p>
+  openSheet(`<div class="about"><img class="app-logo" src="icons/icon.svg" alt=""><h2 class="center">${t('appName')}</h2>
+    <p class="muted small center">${t('tagline')} · v${C.APP_VERSION}</p><div class="about-sep"></div>
+    <small class="muted center">${t('aboutDev')}</small><h3 class="center">${esc(DEVELOPER.name)}</h3>
     <div class="card list"><a class="lrow" href="mailto:${DEVELOPER.email}">${I.mail}<span class="grow">${esc(DEVELOPER.email)}</span><span class="chev">${I.chev}</span></a></div>
     <button class="btn soft wide" data-a="copyText" data-v="${esc(DEVELOPER.email)}">${t('copyEmail')}</button>
-    <p class="hint">${t('devNote')}</p><p class="hint">${t('appName')} · v${C.APP_VERSION}</p></div>`, 'about');
+    <p class="hint">${t('devNote')}</p></div>`, 'about');
 }
 
 /* ───────── Pro ───────── */
+const PRO_FEATS = [
+  { k: 'insights', ic: 'chart', go: 'goInsights' }, { k: 'shared', ic: 'users', go: 'shared' }, { k: 'cats', ic: 'tag', go: 'cats' },
+  { k: 'themes', ic: 'palette', go: 'theme' }, { k: 'lock', ic: 'finger', go: 'goSettings' }, { k: 'hide', ic: 'eye', go: 'goSettings' },
+  { k: 'export', ic: 'download', go: 'export' }, { k: 'recurring', ic: 'repeat', go: 'recurring' }, { k: 'fx', ic: 'medal' },
+];
+const PRO_SOON = [];
+function featList(owned) {
+  return `<div class="card list feat-list">${PRO_FEATS.map(f => `<${owned && f.go ? 'button' : 'div'} class="lrow feat" ${owned && f.go ? `data-a="proGo" data-v="${f.go}"` : ''}>
+    <span class="feat-ic">${owned ? I.check : I[f.ic]}</span><span class="grow"><b>${t('pf_' + f.k)}</b><small class="muted">${t('pd_' + f.k)}</small></span>${owned && f.go ? `<span class="chev">${I.chev}</span>` : ''}</${owned && f.go ? 'button' : 'div'}>`).join('')}</div>
+    ${PRO_SOON.length ? `<h4>${t('comingSoon')}</h4>` : ''}<div class="card list feat-list ${PRO_SOON.length ? '' : 'hidden'}">${PRO_SOON.map(k => `<div class="lrow feat soon"><span class="feat-ic">✨</span><span class="grow"><b>${t('ps_' + k)}</b><small class="muted">${t('psd_' + k)}</small></span></div>`).join('')}</div>`;
+}
 function openPaywall(reason = '') {
-  const ps = proState(), feats = ['pf_targets', 'pf_themes', 'pf_export', 'pf_recurring', 'pf_fx'];
-  openSheet(`<div class="paywall"><div class="crown">${I.crown}</div><h2>${t('proName')}</h2>${reason ? `<p class="pill">${t('why_' + reason)}</p>` : ''}
-    <ul class="feats">${feats.map(f => `<li>${I.check}<span>${t(f)}</span></li>`).join('')}</ul>
-    <div class="price"><b>৳${dg(C.PRO_PRICE)}</b><small>${t('oneTime')}</small></div>
-    ${ps.s === 'trial' ? `<p class="hint">${t('trialLeft', { d: dg(ps.left) })}</p>` : ''}
-    <button class="btn primary big" data-a="payNow">${t('payBkash')}</button><p class="hint">${t('freeForever')}</p></div>`, 'paywall');
+  const ps = proState();
+  if (ps.s === 'pro') return openProBenefits();
+  openSheet(`<div class="paywall"><div class="crown">${I.crown}</div><h2>${t('proName')}</h2>
+    ${reason ? `<p class="pill">${t('why_' + reason)}</p>` : ''}
+    ${ps.s === 'trial' ? `<p class="trial-note">${t('trialUsing', { d: dg(ps.left) })}</p>` : ''}</div>
+    <h4>${t('youGet')}</h4>${featList(false)}
+    <div class="paywall"><div class="price"><b>৳${dg(C.PRO_PRICE)}</b><small>${t('oneTime')}</small></div>
+    <button class="btn primary big" data-a="payNow">${t('payBkash')}</button><p class="hint">${t('freeForever')}</p></div>`, 'paywall', 'tall');
+}
+function openProBenefits() {
+  const ps = proState();
+  openSheet(`<div class="paywall"><div class="crown">${I.crown}</div><h2>${t('youArePro')}</h2>
+    ${ps.since ? `<p class="muted small">${t('proSince', { d: dLong(new Date(ps.since).toISOString().slice(0, 10)) })}</p>` : ''}</div>
+    <h4>${t('youHave')}</h4>${featList(true)}<p class="hint">${t('thanks')}</p>`, 'benefits', 'tall');
 }
 function openPay() {
   if (!S.user) return openBackup(openPay);
@@ -1063,12 +1284,69 @@ const ACT = {
     if (S.dirty.size) { toast(t('logoutUnsynced'), { type: 'warn' }); return; }
     await store.signOut();
     const prefs = { ...P }, first = S.settings.firstOpen;
+    (S.books || []).forEach(b => dropBookLocal(b.id)); S.books = []; localStorage.removeItem('tk_books'); localStorage.setItem('tk_active_book', 'me');
     [LK.data, LK.dirty, LK.settings, LK.sdirty].forEach(k => localStorage.removeItem(k));
+    S.bookId = 'me'; S.meta = null;
     loadLocal(); Object.assign(P, prefs); S.settings.firstOpen = first; localStorage.setItem(LK.settings, JSON.stringify(S.settings));
     applyPrefs(); render(); toast(t('loggedOut'));
   },
   pay: () => openPaywall(),
   privacy: () => openPrivacy(),
+  goInsights: () => { S.view = 'charts'; S.chartTab = 'insights'; render(); scrollTo(0, 0); },
+  goSettings: () => { S.view = 'me'; render(); setTimeout(() => $('.toggle-row')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100); },
+  toggleHide: () => { S.hidden = !S.hidden; buzz(8); render(); },
+  hideBtn: el => { if (!isPro()) { el.checked = false; return openPaywall(); } setPref('hideBtn', el.checked); S.hidden = el.checked; render(); },
+  lockToggle: el => { if (el.checked) enableLock(); else disableLock(); },
+  lockAfter: el => { const lc = lockCfg(); lc.after = +el.dataset.v; localStorage.setItem('tk_lock', JSON.stringify(lc)); render(); },
+  shared: () => openShared(),
+  bookPick: () => openBookPick(),
+  bookSwap: () => { const b = S.books?.[0]; if (b) switchBook(S.meta ? 'me' : b.id); },
+  goBook: el => switchBook(el.dataset.v),
+  bookDetail: el => openBookDetail(el.dataset.v),
+  async createBook() {
+    if (!isPro()) return openPaywall();
+    if (S.books?.length) return toast(t('oneBookOnly'), { type: 'warn' });
+    const name = ($('#bkName').value || t('familyBook')).trim();
+    try {
+      const b = await store.createBook(name, { cats: S.settings.cats.map(c => ({ ...c })), targets: [], updatedAt: Date.now() });
+      S.books = await store.myBooks(); localStorage.setItem('tk_books', JSON.stringify(S.books));
+      confetti(60); openBookDetail(b.id);
+    } catch (e) {
+      if (e.code === 'book/need-pro') return openPaywall();
+      toast(t(e.code === 'book/one-only' ? 'oneBookOnly' : e.code === 'net' ? 'netError' : 'errGeneric'), { type: 'warn' });
+    }
+  },
+  async joinBook() {
+    const code = ($('#bkCode').value || '').trim().toUpperCase();
+    try { const id = await store.joinBook(code); S.books = await store.myBooks(); localStorage.setItem('tk_books', JSON.stringify(S.books)); toast(t('joined'), { big: true }); switchBook(id); }
+    catch (e) { $('#bkErr').textContent = t(e.code === 'book/not-found' ? 'codeWrong' : e.code === 'book/one-only' ? 'oneBookOnly' : e.code === 'net' ? 'netError' : 'errGeneric'); }
+  },
+  async kick(el) {
+    if (!await askConfirm(t('kickConfirm'), t('remove'))) return;
+    try { await store.removeMember(el.dataset.v, el.dataset.u); S.books = await store.myBooks(); localStorage.setItem('tk_books', JSON.stringify(S.books)); openBookDetail(el.dataset.v); }
+    catch (e) { toast(t(e.code === 'net' ? 'netError' : 'errGeneric'), { type: 'warn' }); }
+  },
+  async leaveBook(el) {
+    if (!await askConfirm(t('leaveConfirm'), t('leaveBook'))) return; const id = el.dataset.v;
+    try { await store.leaveBook(id); } catch (e) { return toast(t(e.code === 'net' ? 'netError' : 'errGeneric'), { type: 'warn' }); }
+    dropBookLocal(id); S.books = (S.books || []).filter(b => b.id !== id); localStorage.setItem('tk_books', JSON.stringify(S.books)); closeSheet(); switchBook('me');
+  },
+  async deleteBook(el) {
+    if (!await askConfirm(t('deleteBookConfirm'), t('deleteBook'))) return; const id = el.dataset.v;
+    try { await store.deleteBook(id); } catch (e) { return toast(t(e.code === 'net' ? 'netError' : 'errGeneric'), { type: 'warn' }); }
+    dropBookLocal(id); S.books = (S.books || []).filter(b => b.id !== id); localStorage.setItem('tk_books', JSON.stringify(S.books)); closeSheet(); switchBook('me');
+  },
+  async shareCode(el) { const txt = t('inviteMsg', { c: el.dataset.v }) + ' ' + appLink(); if (navigator.share) { try { await navigator.share({ text: txt }); } catch { } } else { try { await navigator.clipboard.writeText(txt); toast(t('copied')); } catch { } } },
+  async demoPartner(el) { await store.demoAddPartner(el.dataset.v); S.books = await store.myBooks(); localStorage.setItem('tk_books', JSON.stringify(S.books)); if (S.bookId === el.dataset.v) await sync(); openBookDetail(el.dataset.v); toast(t('demoPartnerDone')); },
+  proBenefits: () => openProBenefits(),
+  proGo: el => { closeSheet(); setTimeout(() => ACT[el.dataset.v]?.(), 300); },
+  demoPro: el => { localStorage.setItem('tk_demo_pro', el.checked ? '1' : '0'); if (el.checked) localStorage.setItem('tk_demo_trial_end', '0'); enforceFree(); render(); },
+  demoTrialEnd: el => { localStorage.setItem('tk_demo_trial_end', el.checked ? '1' : '0'); if (el.checked) { localStorage.setItem('tk_demo_pro', '0'); if (P.hideBtn) { S.hidden = false; } } enforceFree(); render(); },
+  async shareNative() {
+    const data = { title: t('appName'), text: t('shareMsg'), url: appLink() };
+    if (navigator.share) { try { await navigator.share(data); } catch { } }
+    else { try { await navigator.clipboard.writeText(t('shareMsg') + ' ' + appLink()); toast(t('copied')); } catch { toast(appLink()); } }
+  },
   aboutDev: () => openAboutDev(),
   payNow: () => openPay(),
 };

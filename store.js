@@ -89,6 +89,58 @@ function demoServer() {
     },
     listenMyPayments(cb) { return watch(() => cb(Object.values(load().payments).filter(p => p.uid === cur?.uid).sort((a, b) => b.createdAt - a.createdAt))); },
 
+
+    // ── shared family books (demo server) ──
+    async createBook(name, meta) {
+      await wait();
+      const db = load(), id = 'b' + rid(10), A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      if (Object.values(db.books || {}).some(x => x.members.some(m => m.uid === cur.uid))) throw err('book/one-only');
+      let code; do { code = Array.from(crypto.getRandomValues(new Uint8Array(6)), b => A[b % 32]).join(''); } while (Object.values(db.books || {}).some(b => b.code === code));
+      (db.books ||= {})[id] = { id, name, owner: cur.uid, code, members: [{ uid: cur.uid, email: cur.email }], meta };
+      (db.bookEntries ||= {})[id] = {};
+      save(db); return { id, code };
+    },
+    async myBooks() {
+      const db = load();
+      return Object.values(db.books || {}).filter(b => b.members.some(m => m.uid === cur?.uid))
+        .map(b => ({ id: b.id, name: b.name, owner: b.owner, members: b.members, code: b.owner === cur.uid ? b.code : null }));
+    },
+    async joinBook(code) {
+      await wait();
+      const db = load(), b = Object.values(db.books || {}).find(x => x.code === code);
+      if (!b) throw err('book/not-found');
+      const already = Object.values(db.books || {}).some(x => x.id !== b.id && x.members.some(m => m.uid === cur.uid));
+      if (already) throw err('book/one-only');     // one shared book per person
+      if (!b.members.some(m => m.uid === cur.uid)) b.members.push({ uid: cur.uid, email: cur.email });
+      save(db); return b.id;
+    },
+    async bookInfo(id) {
+      const b = load().books?.[id];
+      if (!b || !b.members.some(m => m.uid === cur?.uid)) return null;
+      return { name: b.name, owner: b.owner, members: b.members, code: b.owner === cur.uid ? b.code : null, meta: b.meta };
+    },
+    async pullBook(id) { await wait(); return Object.values(load().bookEntries?.[id] || {}); },
+    async pushBook(id, list) {
+      await wait();
+      const db = load(), box = ((db.bookEntries ||= {})[id] ||= {});
+      list.forEach(r => { const o = box[r.id]; if (!o || (r.updatedAt || 0) >= (o.updatedAt || 0)) box[r.id] = { ...r, by: r.by || o?.by || cur.uid }; });
+      save(db);
+    },
+    async putBookMeta(id, meta) { const db = load(); if (db.books?.[id]) { db.books[id].meta = meta; save(db); } },
+    async removeMember(id, uid) { const db = load(), b = db.books[id]; if (b.owner !== cur.uid) throw err('book/not-owner'); b.members = b.members.filter(m => m.uid !== uid); save(db); },
+    async leaveBook(id) { const db = load(), b = db.books[id]; b.members = b.members.filter(m => m.uid !== cur.uid); save(db); },
+    async deleteBook(id) { const db = load(); if (db.books?.[id]?.owner !== cur.uid) throw err('book/not-owner'); delete db.books[id]; delete db.bookEntries?.[id]; save(db); },
+    // demo only: pretend a family member joined and logged a few expenses
+    async demoAddPartner(id) {
+      const db = load(), b = db.books[id], uid = 'u-demo-partner';
+      if (!b.members.some(m => m.uid === uid)) b.members.push({ uid, email: 'nusrat@demo.com' });
+      const box = ((db.bookEntries ||= {})[id] ||= {}), d = new Date(), pad = n => String(n).padStart(2, '0');
+      const day = k => { const x = new Date(d.getFullYear(), d.getMonth(), Math.max(1, d.getDate() - k)); return `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`; };
+      [[1850, 'grocery', 'মাছ-সবজি', 0], [650, 'food', '', 1], [1200, 'shopping', 'বাচ্চার জামা', 2], [300, 'transport', 'রিকশা', 3]].forEach(([amt, cat, note, k], i) => {
+        const eid = 'demo-p-' + i; box[eid] = { id: eid, amt, cat, note, date: day(k), created: Date.now() - i, updatedAt: Date.now(), by: uid };
+      });
+      save(db);
+    },
     // admin
     listenAllPayments(cb) { return watch(() => cb(Object.values(load().payments).sort((a, b) => b.createdAt - a.createdAt))); },
     async approve(p) { const db = load(); db.payments[p.trxId].status = 'approved'; db.payments[p.trxId].decidedAt = Date.now(); if (db.users[p.uid]) { db.users[p.uid].pro = true; db.users[p.uid].proSince = Date.now(); } save(db); ping(); },
@@ -153,6 +205,48 @@ async function supabaseServer() {
   function poll(fn, ms) { pollers.add(fn); fn(); const iv = setInterval(() => { if (!document.hidden) fn(); }, ms); return () => { clearInterval(iv); pollers.delete(fn); }; }
   const normPay = r => ({ trxId: r.trx_id, uid: r.uid, email: r.email, sender: r.sender, amount: r.amount, status: r.status, method: r.method, createdAt: Date.parse(r.created_at), decidedAt: r.decided_at ? Date.parse(r.decided_at) : null });
 
+
+  // ── entries: shared by the personal book and the shared book ──
+  // Incremental pull (only rows changed since last time) + a full re-check once a day.
+  async function pullFrom(b, curKey, fullKey, full) {
+    if (Date.now() - (+localStorage.getItem(fullKey) || 0) > 864e5) full = true;
+    const since = full ? null : localStorage.getItem(curKey);
+    const rows = [];
+    let maxSync = since;
+    for (let from = 0; ; from += 1000) {
+      let q = sb.from('entries').select('id,amt,cat,note,date,rec,created,updated_at,deleted,who,synced_at').eq('book_id', b);
+      if (since) q = q.gt('synced_at', since);
+      const { data, error } = await q.order('synced_at').range(from, from + 999);
+      if (error) fail(error);
+      rows.push(...data);
+      if (data.length < 1000) break;
+    }
+    rows.forEach(r => { if (!maxSync || r.synced_at > maxSync) maxSync = r.synced_at; });
+    if (maxSync) localStorage.setItem(curKey, maxSync);
+    if (full) localStorage.setItem(fullKey, String(Date.now()));
+    return rows.map(r => r.deleted
+      ? { id: r.id, deleted: true, updatedAt: Number(r.updated_at) }
+      : { id: r.id, amt: Number(r.amt), cat: r.cat, note: r.note || '', date: r.date, rec: r.rec || null, created: Number(r.created) || 0, updatedAt: Number(r.updated_at), ...(r.who ? { by: r.who } : {}) });
+  }
+  async function pushTo(b, list) {
+    const rows = list.map(e => e.deleted
+      ? { book_id: b, id: e.id, deleted: true, updated_at: e.updatedAt, by: user.uid, amt: 0 }
+      : { book_id: b, id: e.id, amt: e.amt, cat: e.cat, note: e.note || '', date: e.date, rec: e.rec || null, created: e.created || 0, updated_at: e.updatedAt, deleted: false, by: user.uid, who: e.by || user.uid });
+    for (let i = 0; i < rows.length; i += 500) {
+      const { error } = await sb.from('entries').upsert(rows.slice(i, i + 500), { onConflict: 'book_id,id' });
+      if (error) fail(error);
+    }
+  }
+  // shared-book errors come back as messages like "book/one-only"
+  const rpc = async (fn, args) => {
+    const { data, error } = await sb.rpc(fn, args);
+    if (error) { const m = /book\/[a-z-]+/.exec(error.message || ''); if (m) throw err(m[0]); fail(error); }
+    return data;
+  };
+  const bKeys = id => ['tk_pullb_' + user?.uid + '_' + id, 'tk_fullb_' + user?.uid + '_' + id];
+  const forgetBook = id => bKeys(id).forEach(k => localStorage.removeItem(k));
+  const slimBook = b => ({ id: b.id, name: b.name || '', owner: b.owner, code: b.code || null, members: b.members || [] });
+
   return {
     mode: 'supabase',
     onAuth(cb) { authCb = cb; deliver(); },
@@ -182,38 +276,8 @@ async function supabaseServer() {
     },
 
     // entries — the server keeps the newest version (see trigger in supabase.sql)
-    async pull({ full = false } = {}) {
-      const b = await ready();
-      const fk = 'tk_full_' + user.uid;
-      if (Date.now() - (+localStorage.getItem(fk) || 0) > 864e5) full = true;   // safety: full re-check once a day
-      const since = full ? null : localStorage.getItem(pullKey());
-      const rows = [];
-      let maxSync = since;
-      for (let from = 0; ; from += 1000) {
-        let q = sb.from('entries').select('id,amt,cat,note,date,rec,created,updated_at,deleted,synced_at').eq('book_id', b);
-        if (since) q = q.gt('synced_at', since);
-        const { data, error } = await q.order('synced_at').range(from, from + 999);
-        if (error) fail(error);
-        rows.push(...data);
-        if (data.length < 1000) break;
-      }
-      rows.forEach(r => { if (!maxSync || r.synced_at > maxSync) maxSync = r.synced_at; });
-      if (maxSync) localStorage.setItem(pullKey(), maxSync);
-      if (full) localStorage.setItem(fk, String(Date.now()));
-      return rows.map(r => r.deleted
-        ? { id: r.id, deleted: true, updatedAt: Number(r.updated_at) }
-        : { id: r.id, amt: Number(r.amt), cat: r.cat, note: r.note || '', date: r.date, rec: r.rec || null, created: Number(r.created) || 0, updatedAt: Number(r.updated_at) });
-    },
-    async push(list) {
-      const b = await ready();
-      const rows = list.map(e => e.deleted
-        ? { book_id: b, id: e.id, deleted: true, updated_at: e.updatedAt, by: user.uid, amt: 0 }
-        : { book_id: b, id: e.id, amt: e.amt, cat: e.cat, note: e.note || '', date: e.date, rec: e.rec || null, created: e.created || 0, updated_at: e.updatedAt, deleted: false, by: user.uid });
-      for (let i = 0; i < rows.length; i += 500) {
-        const { error } = await sb.from('entries').upsert(rows.slice(i, i + 500), { onConflict: 'book_id,id' });
-        if (error) fail(error);
-      }
-    },
+    async pull({ full = false } = {}) { return pullFrom(await ready(), pullKey(), 'tk_full_' + user.uid, full); },
+    async push(list) { return pushTo(await ready(), list); },
     async getSettings() {
       const { data, error } = await sb.from('user_settings').select('data,updated_at').eq('user_id', user.uid).maybeSingle();
       if (error) fail(error);
@@ -237,6 +301,22 @@ async function supabaseServer() {
       }, 30000);
     },
 
+
+    // ── shared family book (see the "Shared family book" part of supabase.sql) ──
+    async myBooks() { return ((await rpc('my_books')) || []).map(slimBook); },
+    async createBook(name, meta) { const r = await rpc('create_shared_book', { p_name: name, p_meta: meta }); return { id: r.id, code: r.code }; },
+    async joinBook(code) { const id = await rpc('join_book', { p_code: code }); forgetBook(id); return id; },
+    async bookInfo(id) {
+      const b = ((await rpc('my_books')) || []).find(x => x.id === id);
+      return b ? { ...slimBook(b), meta: b.meta || null } : null;
+    },
+    async pullBook(id, { full = false } = {}) { const [c, f] = bKeys(id); return pullFrom(id, c, f, full); },
+    async pushBook(id, list) { return pushTo(id, list); },
+    async putBookMeta(id, meta) { await rpc('put_book_meta', { p_book: id, p_meta: meta }); },
+    async removeMember(id, uid) { await rpc('remove_member', { p_book: id, p_user: uid }); },
+    async leaveBook(id) { await rpc('leave_book', { p_book: id }); forgetBook(id); },
+    async deleteBook(id) { await rpc('delete_book', { p_book: id }); forgetBook(id); },
+    async demoAddPartner() {},
     // admin (every check is repeated on the server inside the SQL functions)
     listenAllPayments(cb) {
       return poll(async () => {
